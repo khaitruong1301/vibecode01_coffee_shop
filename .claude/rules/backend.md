@@ -13,7 +13,7 @@ paths:
 - Cấu hình app (prefix `/api`, pipe, filter, cookie, CORS) ở `backend/src/app.factory.ts` — dùng chung cho `main.ts` và e2e test.
 
 ## Xác thực & phân quyền
-- `JwtAuthGuard` + `RolesGuard` là guard toàn cục: mọi route mặc định cần đăng nhập. Chỉ `login`, `logout`, `health` được `@Public()`.
+- `JwtAuthGuard` + `RolesGuard` là guard toàn cục: mọi route mặc định cần đăng nhập. Chỉ `login`, `logout`, `health` và webhook SePay (`POST /payments/sepay/webhook`) được `@Public()` — webhook bắt buộc kèm `@UseGuards(SepayApiKeyGuard)` (header `Authorization: Apikey …`).
 - Phân quyền bằng `@Auth('cashier' | 'barista' | 'admin', …)` (bên trong là `@Roles`); người thao tác lấy bằng `@CurrentUser()`, không từ body.
 - Kiểm tra quyền theo dữ liệu (ví dụ `?all=true` chỉ admin) làm trong controller/service, ném `ForbiddenException`.
 

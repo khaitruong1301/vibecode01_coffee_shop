@@ -16,6 +16,10 @@ const MATRIX: { method: 'get' | 'post' | 'patch'; path: string; body?: object; r
   { method: 'get', path: '/api/orders', roles: ['cashier', 'barista', 'admin'] },
   { method: 'get', path: '/api/orders/CP-000001', roles: ['cashier', 'barista', 'admin'] },
   { method: 'patch', path: '/api/orders/1/status', body: { status: 'preparing' }, roles: ['barista', 'admin'] },
+  { method: 'get', path: '/api/orders?payment=unpaid', roles: ['cashier', 'admin'] },
+  { method: 'post', path: '/api/orders/1/pay-cash', roles: ['cashier', 'admin'] },
+  { method: 'get', path: '/api/payments/transactions', roles: ['cashier', 'admin'] },
+  { method: 'get', path: '/api/payments/settings', roles: ['cashier', 'barista', 'admin'] },
   { method: 'get', path: '/api/quality/report', roles: ['admin'] },
   { method: 'patch', path: '/api/auth/password', body: {}, roles: ['cashier', 'barista', 'admin'] },
 ];

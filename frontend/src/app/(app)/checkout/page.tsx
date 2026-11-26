@@ -6,8 +6,8 @@ import { useRequireRole } from '@/components/AuthProvider';
 import { Alert, Button, Chip, Input, Modal, Spinner } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { MAX_QTY, priceOf, stepQty, summarize } from '@/lib/cart';
-import { formatVnd, SOURCE_LABEL } from '@/lib/format';
-import type { Order, OrderSource, Product, ProductList, Size } from '@/lib/types';
+import { formatVnd, PAYMENT_METHOD_LABEL, SOURCE_LABEL } from '@/lib/format';
+import type { Order, OrderSource, PaymentMethod, PaymentSettings, Product, ProductList, Size } from '@/lib/types';
 
 const SIZES: Size[] = ['S', 'M', 'L'];
 const CART_KEY = 'coffeepos_cart';
@@ -25,6 +25,7 @@ interface SavedCart {
   source: OrderSource;
   partnerCode: string;
   note: string;
+  paymentMethod?: PaymentMethod;
 }
 
 function loadCart(): SavedCart | null {
@@ -62,6 +63,9 @@ export default function CheckoutPage() {
   const [source, setSource] = useState<OrderSource>(saved?.source ?? 'counter');
   const [partnerCode, setPartnerCode] = useState(saved?.partnerCode ?? '');
   const [note, setNote] = useState(saved?.note ?? '');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(saved?.paymentMethod ?? 'cash');
+  // UC07 — chỉ bật "Chuyển khoản" khi server đã cấu hình tài khoản nhận tiền. Lỗi tải → coi như chưa bật.
+  const [transferEnabled, setTransferEnabled] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<{ message: string; details?: Record<string, string> } | null>(null);
@@ -85,8 +89,15 @@ export default function CheckoutPage() {
   }, [allowed, fetchMenu]);
 
   useEffect(() => {
-    saveCart({ lines, source, partnerCode, note });
-  }, [lines, source, partnerCode, note]);
+    if (!allowed) return;
+    api<PaymentSettings>('/payments/settings')
+      .then((s) => setTransferEnabled(s.transferEnabled))
+      .catch(() => setTransferEnabled(false));
+  }, [allowed]);
+
+  useEffect(() => {
+    saveCart({ lines, source, partnerCode, note, paymentMethod });
+  }, [lines, source, partnerCode, note, paymentMethod]);
 
   const productById = useMemo(() => new Map(menu?.items.map((p) => [p.id, p]) ?? []), [menu]);
   const categories = useMemo(() => {
@@ -109,6 +120,8 @@ export default function CheckoutPage() {
 
   const { errors, hasErrors, subtotal, surcharge, total } = summarize(cart);
   const needPartnerCode = source !== 'counter' && !partnerCode.trim();
+  // Chuyển khoản chỉ cho đơn tại quầy; đơn GrabFood/ShopeeFood do đối tác thu tiền.
+  const method: PaymentMethod = source === 'counter' && transferEnabled ? paymentMethod : 'cash';
   const canPay = cart.length > 0 && !hasErrors && !needPartnerCode && !saving;
 
   function addToCart(p: Product) {
@@ -140,6 +153,7 @@ export default function CheckoutPage() {
     setNote('');
     setPartnerCode('');
     setSource('counter');
+    setPaymentMethod('cash');
     setSubmitError(null);
   }
 
@@ -156,10 +170,11 @@ export default function CheckoutPage() {
           source,
           partnerCode: source === 'counter' ? undefined : partnerCode.trim(),
           note: note.trim() || undefined,
+          paymentMethod: method,
         },
       });
       resetCart();
-      saveCart({ lines: [], source: 'counter', partnerCode: '', note: '' });
+      saveCart({ lines: [], source: 'counter', partnerCode: '', note: '', paymentMethod: 'cash' });
       router.push(`/receipt/${order.code}`);
     } catch (e) {
       setSaving(false);
@@ -341,6 +356,27 @@ export default function CheckoutPage() {
           <p className="text-xs text-muted">Tổng tạm tính trên máy — server tính lại khi lưu.</p>
         </div>
 
+        {source === 'counter' && (
+          <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Phương thức thanh toán">
+            <span className="w-full text-sm font-semibold">Khách trả:</span>
+            {(Object.keys(PAYMENT_METHOD_LABEL) as PaymentMethod[]).map((m) => (
+              <Chip
+                key={m}
+                active={method === m}
+                disabled={m === 'transfer' && !transferEnabled}
+                title={m === 'transfer' && !transferEnabled ? 'Chủ quán chưa cấu hình tài khoản nhận chuyển khoản' : undefined}
+                onClick={() => setPaymentMethod(m)}
+                className="min-h-11 flex-1 whitespace-nowrap"
+              >
+                {m === 'cash' ? '💵' : '📱'} {PAYMENT_METHOD_LABEL[m]}
+              </Chip>
+            ))}
+            {method === 'transfer' && (
+              <p className="w-full text-xs text-muted">Lưu đơn xong sẽ hiện mã QR. Đơn chỉ chuyển sang quầy pha khi nhận đủ tiền.</p>
+            )}
+          </div>
+        )}
+
         {submitError && (
           <div className="mt-3">
             <Alert>
@@ -357,7 +393,7 @@ export default function CheckoutPage() {
         )}
 
         <Button size="lg" className="mt-3 w-full" disabled={!canPay} loading={saving} onClick={pay}>
-          {saving ? 'Đang lưu đơn…' : `Thanh toán · ${formatVnd(total)}`}
+          {saving ? 'Đang lưu đơn…' : `${method === 'transfer' ? 'Thanh toán chuyển khoản' : 'Thanh toán'} · ${formatVnd(total)}`}
         </Button>
         {cart.length > 0 && (
           <Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => window.confirm('Hủy đơn đang làm?') && resetCart()} disabled={saving}>

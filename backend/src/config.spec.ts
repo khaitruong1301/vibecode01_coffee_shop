@@ -17,6 +17,13 @@ describe('Kiểm tra cấu hình production (từ chối khởi động nếu kh
     expect(productionConfigErrors({ APP_ENV: 'production', JWT_SECRET: STRONG, SEED: 'true' })[0]).toContain('SEED_PASSWORD');
   });
 
+  it('production + SEPAY_WEBHOOK_KEY quá ngắn → lỗi; bỏ trống (tắt webhook) hoặc đủ dài → hợp lệ', () => {
+    const base = { APP_ENV: 'production', JWT_SECRET: STRONG, SEED: 'false' };
+    expect(productionConfigErrors({ ...base, SEPAY_WEBHOOK_KEY: 'ngan' })[0]).toContain('SEPAY_WEBHOOK_KEY');
+    expect(productionConfigErrors({ ...base, SEPAY_WEBHOOK_KEY: 'k'.repeat(24) })).toEqual([]);
+    expect(productionConfigErrors(base)).toEqual([]);
+  });
+
   it('production cấu hình đầy đủ → hợp lệ', () => {
     expect(productionConfigErrors({ APP_ENV: 'production', JWT_SECRET: STRONG, SEED: 'true', SEED_PASSWORD: 'MatKhauRieng2026' })).toEqual([]);
     expect(productionConfigErrors({ APP_ENV: 'production', JWT_SECRET: STRONG, SEED: 'false' })).toEqual([]);

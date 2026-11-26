@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CheckoutPage from '@/app/(app)/checkout/page';
@@ -25,16 +25,19 @@ const MENU: ProductList = {
 type Handler = (body: unknown) => { status: number; body?: unknown };
 let onCreateOrder: Handler;
 let sentBodies: unknown[];
+let transferEnabled: boolean;
 
 beforeEach(() => {
   push.mockReset();
   sentBodies = [];
+  transferEnabled = false;
   onCreateOrder = () => ({ status: 201, body: { code: 'CP-000009' } });
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = String(input);
     const json = (status: number, body?: unknown) =>
       new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
     if (url === '/api/products') return json(200, MENU);
+    if (url === '/api/payments/settings') return json(200, { transferEnabled, webhookKeyConfigured: true, webhookPath: '/api/payments/sepay/webhook', bank: null, accountNo: null, accountName: null });
     if (url === '/api/orders' && init?.method === 'POST') {
       const body = JSON.parse(String(init.body));
       sentBodies.push(body);
@@ -92,9 +95,42 @@ describe('Màn bán hàng (UC02)', () => {
     await screen.findByRole('heading', { name: 'Cà phê sữa đá' });
     await addCaPheL(2);
     await userEvent.click(payButton());
-    expect(sentBodies).toEqual([{ items: [{ productId: 2, size: 'L', quantity: 2 }], source: 'counter' }]);
+    expect(sentBodies).toEqual([{ items: [{ productId: 2, size: 'L', quantity: 2 }], source: 'counter', paymentMethod: 'cash' }]);
     expect(JSON.stringify(sentBodies)).not.toMatch(/price|total/i);
     expect(push).toHaveBeenCalledWith('/receipt/CP-000009');
+  });
+
+  it('chưa cấu hình tài khoản nhận tiền → không chọn được Chuyển khoản (UC07)', async () => {
+    render(<CheckoutPage />);
+    await screen.findByRole('heading', { name: 'Cà phê sữa đá' });
+    expect(screen.getByRole('button', { name: /Chuyển khoản/ })).toBeDisabled();
+  });
+
+  it('chọn Chuyển khoản → gửi paymentMethod transfer, không gửi giá (UC07)', async () => {
+    transferEnabled = true;
+    render(<CheckoutPage />);
+    await screen.findByRole('heading', { name: 'Cà phê sữa đá' });
+    await addCaPheL();
+    const transfer = screen.getByRole('button', { name: /Chuyển khoản/ });
+    await waitFor(() => expect(transfer).toBeEnabled());
+    await userEvent.click(transfer);
+    expect(payButton()).toHaveTextContent('Thanh toán chuyển khoản · 35.000đ');
+    expect(screen.getByText(/Lưu đơn xong sẽ hiện mã QR/)).toBeInTheDocument();
+    await userEvent.click(payButton());
+    expect(sentBodies[0]).toMatchObject({ paymentMethod: 'transfer', source: 'counter' });
+    expect(JSON.stringify(sentBodies)).not.toMatch(/price|total/i);
+  });
+
+  it('đơn GrabFood: ẩn chọn phương thức, luôn gửi tiền mặt (đối tác thu tiền)', async () => {
+    transferEnabled = true;
+    render(<CheckoutPage />);
+    await screen.findByRole('heading', { name: 'Cà phê sữa đá' });
+    await addCaPheL();
+    await userEvent.click(screen.getByRole('button', { name: 'GrabFood' }));
+    expect(screen.queryByRole('group', { name: 'Phương thức thanh toán' })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Mã đơn GrabFood'), 'GF-9');
+    await userEvent.click(payButton());
+    expect(sentBodies[0]).toMatchObject({ source: 'grabfood', paymentMethod: 'cash' });
   });
 
   it('đơn GrabFood: bắt buộc mã đơn đối tác trước khi thanh toán (UC04)', async () => {
