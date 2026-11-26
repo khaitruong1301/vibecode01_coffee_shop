@@ -21,7 +21,7 @@ test.describe('Thanh toán chuyển khoản SePay', () => {
     await expect(panel).toContainText('0123456789');
     await expect(panel).toContainText('35.000đ');
     const content = (await panel.locator('span.tabular').first().textContent())?.trim() ?? '';
-    expect(content).toMatch(/^CP\d{6}$/);
+    expect(content).toMatch(/^CF\d{6}$/);
     const code = page.url().split('/').pop() as string;
 
     // Chưa trả tiền → quầy pha chưa thấy đơn

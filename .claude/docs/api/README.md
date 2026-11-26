@@ -130,7 +130,7 @@ Mật khẩu mới: 8–72 ký tự (≤ 72 byte), có chữ và số, khác m�
 ```json
 "paymentMethod": "transfer", "paymentStatus": "unpaid", "paymentLabel": "Chờ chuyển khoản", "paidAt": null, "amountReceived": 0,
 "transfer": { "bank": "MBBank", "accountNo": "0123456789", "accountName": "QUAN CA PHE ABC", "amount": 98000,
-              "content": "CP000001", "qrUrl": "https://qr.sepay.vn/img?acc=0123456789&bank=MBBank&amount=98000&des=CP000001&template=compact" }
+              "content": "CF000001", "qrUrl": "https://qr.sepay.vn/img?acc=0123456789&bank=MBBank&amount=98000&des=CF000001&template=compact" }
 ```
 Lỗi: 401 (chưa đăng nhập), 403 (pha chế), 400 (đơn rỗng, số lượng sai, món ngừng bán / không tồn tại, thiếu size, thiếu mã đơn đối tác, chuyển khoản cho đơn đối tác, chưa cấu hình tài khoản nhận chuyển khoản).
 
@@ -151,13 +151,13 @@ Authorization: Apikey <SEPAY_WEBHOOK_KEY>
 ```json
 {
   "id": 92704, "gateway": "MBBank", "transactionDate": "2026-11-26 14:02:37", "accountNumber": "0123456789",
-  "code": null, "content": "NGUYEN VAN A chuyen tien CP000001", "transferType": "in", "transferAmount": 98000,
+  "code": null, "content": "NGUYEN VAN A chuyen tien CF000001", "transferType": "in", "transferAmount": 98000,
   "accumulated": 19077000, "subAccount": null, "referenceCode": "MBVCB.3278907687", "description": "..."
 }
 ```
 - Chỉ đọc `id`, `gateway`, `transactionDate` (giờ Việt Nam → lưu UTC), `accountNumber`, `code`, `content`, `transferType`, `transferAmount`, `referenceCode`; field khác bị bỏ qua.
 - Chuỗi quá dài (`content` > 500 ký tự…) bị cắt bớt khi lưu, không từ chối. `id` vượt int4 → 400.
-- Mã đơn tìm trong `code` rồi `content`: `CP000001`, chấp nhận `cp-000001`, `CP 000001`, có chữ trước/sau; số vượt int4 không coi là mã đơn.
+- Mã đơn tìm trong `code` rồi `content`: `CF000001`, chấp nhận `cf-000001`, `CF 000001`, có chữ trước/sau; vẫn nhận tiền tố cũ `CP` (đơn tạo trước khi đổi sang `CF`); số vượt int4 không coi là mã đơn. Tiền tố `CF` khớp "Cấu trúc mã thanh toán" trên SePay (tiền tố `CF`, hậu tố 6–10 ký tự, Số nguyên) để SePay điền được field `code`.
 - Chỉ tiền vào **đúng `accountNumber` = `SEPAY_ACCOUNT_NO`** mới được gắn đơn.
 - Đối soát (`backend/src/payments/payment-rules.ts`): tiền ra → `outgoing`; không có mã / đơn không tồn tại / sai tài khoản nhận → `unmatched`; đơn đã thanh toán (kể cả đơn tiền mặt) → `already_paid`; cộng dồn mọi lần chuyển, đủ tổng → `matched` (đơn sang đã thanh toán, hiện ở quầy pha), chưa đủ → `partial`. Chuyển thừa vẫn là `matched` — thu ngân tự hoàn phần thừa.
 - Cùng `id` gửi lại (kể cả đồng thời) chỉ ghi một lần. Khoá dòng đơn khi đối soát để hai giao dịch về cùng lúc không cộng sai.

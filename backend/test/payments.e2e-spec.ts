@@ -71,10 +71,10 @@ describe('Thanh toán chuyển khoản SePay (e2e)', () => {
       expect(o.paidAt).not.toBeNull();
     });
 
-    it('chuyển khoản: chờ thanh toán, trả QR với số tiền + nội dung CP000123', async () => {
+    it('chuyển khoản: chờ thanh toán, trả QR với số tiền + nội dung CF000123', async () => {
       const o = await createOrder('transfer');
       expect(o).toMatchObject({ paymentMethod: 'transfer', paymentStatus: 'unpaid', paidAt: null });
-      expect(o.transfer).toMatchObject({ bank: 'MBBank', accountNo: '0123456789', amount: o.total, content: `CP${String(o.id).padStart(6, '0')}` });
+      expect(o.transfer).toMatchObject({ bank: 'MBBank', accountNo: '0123456789', amount: o.total, content: `CF${String(o.id).padStart(6, '0')}` });
       expect(o.transfer?.qrUrl).toContain('https://qr.sepay.vn/img?');
     });
 
@@ -169,7 +169,7 @@ describe('Thanh toán chuyển khoản SePay (e2e)', () => {
       await t.api().patch(`/api/orders/${o.id}/status`).set(t.as('phache1')).send({ status: 'preparing' }).expect(200);
     });
 
-    it('ngân hàng đổi định dạng mã (cp-000123, có dấu gạch) vẫn khớp; ưu tiên field code của SePay', async () => {
+    it('ngân hàng đổi định dạng mã (cf-000123, có dấu gạch) vẫn khớp; ưu tiên field code của SePay', async () => {
       const a = await createOrder('transfer');
       await hook(sepay({ content: `ck ${a.code.toLowerCase()} cam on`, transferAmount: a.total })).expect(200);
       expect((await getOrder(a.code)).paymentStatus).toBe('paid');
@@ -204,7 +204,7 @@ describe('Thanh toán chuyển khoản SePay (e2e)', () => {
 
     it('chuyển vào đơn đã thanh toán → already_paid (không đổi đơn)', async () => {
       const cash = await createOrder('cash');
-      await hook(sepay({ content: `CP${String(cash.id).padStart(6, '0')}`, transferAmount: cash.total })).expect(200);
+      await hook(sepay({ content: `CF${String(cash.id).padStart(6, '0')}`, transferAmount: cash.total })).expect(200);
       const tx = await t.prisma.bankTransaction.findFirstOrThrow({ where: { orderId: cash.id } });
       expect(tx.status).toBe('already_paid');
       expect((await getOrder(cash.code)).paymentMethod).toBe('cash');
@@ -212,8 +212,8 @@ describe('Thanh toán chuyển khoản SePay (e2e)', () => {
 
     it('không có mã đơn / đơn không tồn tại / tiền ra → vẫn ghi nhận, không gắn đơn', async () => {
       const a = sepay({ content: 'chuyen tien mua cafe' });
-      const b = sepay({ content: 'CP999999' });
-      const c = sepay({ content: 'CP000001', transferType: 'out' });
+      const b = sepay({ content: 'CF999999' });
+      const c = sepay({ content: 'CF000001', transferType: 'out' });
       for (const body of [a, b, c]) await hook(body).expect(200);
       const rows = await t.prisma.bankTransaction.findMany({ where: { sepayId: { in: [a.id, b.id, c.id] as number[] } }, orderBy: { sepayId: 'asc' } });
       expect(rows.map((r) => [r.status, r.orderId])).toEqual([
@@ -258,13 +258,13 @@ describe('Thanh toán chuyển khoản SePay (e2e)', () => {
     });
 
     it('mã CP + số vượt int4 trong nội dung → unmatched (không lỗi 500)', async () => {
-      const body = sepay({ content: 'MBVCB CP3278907687 chuyen tien' });
+      const body = sepay({ content: 'MBVCB CF3278907687 chuyen tien' });
       await hook(body).expect(200);
       expect((await t.prisma.bankTransaction.findUniqueOrThrow({ where: { sepayId: body.id } })).status).toBe('unmatched');
     });
 
     it('nội dung quá 500 ký tự → cắt bớt rồi lưu, không mất giao dịch', async () => {
-      const body = sepay({ content: `CP999998 ${'x'.repeat(800)}` });
+      const body = sepay({ content: `CF999998 ${'x'.repeat(800)}` });
       await hook(body).expect(200);
       const row = await t.prisma.bankTransaction.findUniqueOrThrow({ where: { sepayId: body.id } });
       expect(row.content).toHaveLength(500);

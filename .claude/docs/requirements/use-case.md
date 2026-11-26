@@ -65,12 +65,12 @@ Quan hệ: UC02, UC04, UC05, UC06 `<<include>>` UC01 · UC03 `<<extend>>` UC02 �
 | Mục | Nội dung |
 |---|---|
 | Tác nhân | Thu ngân (chính), Chủ quán, SePay (hệ thống ngoài) |
-| Tiền điều kiện | Server đã cấu hình `SEPAY_BANK`, `SEPAY_ACCOUNT_NO` (+ `SEPAY_ACCOUNT_NAME`) và `SEPAY_WEBHOOK_KEY`; chủ quán đã tạo webhook trên SePay trỏ tới `/api/payments/sepay/webhook` (hướng dẫn trên trang `/payments`) |
+| Tiền điều kiện | Server đã cấu hình `SEPAY_BANK`, `SEPAY_ACCOUNT_NO` (+ `SEPAY_ACCOUNT_NAME`) và `SEPAY_WEBHOOK_KEY`; chủ quán đã tạo webhook trên SePay trỏ tới `/api/payments/sepay/webhook` và khai báo cấu trúc mã thanh toán tiền tố `CF` (hướng dẫn trên trang `/payments`) |
 | Hậu điều kiện | Đơn `payment_status = paid`, có `paid_at`; giao dịch lưu ở `bank_transactions` gắn với đơn; đơn hiện ở màn quầy pha |
 
 **Luồng chính**
 1. Thu ngân chọn món (UC02), ở mục "Khách trả" chọn **Chuyển khoản**, bấm **Thanh toán chuyển khoản**.
-2. Server tạo đơn `transfer` / `unpaid` (chưa hiện ở quầy pha — BR06), trả mã QR VietQR (số tiền + nội dung `CP000123`).
+2. Server tạo đơn `transfer` / `unpaid` (chưa hiện ở quầy pha — BR06), trả mã QR VietQR (số tiền + nội dung `CF000123`).
 3. Màn hóa đơn hiện QR; khách quét bằng app ngân hàng và chuyển tiền.
 4. SePay gọi webhook kèm API key; server tìm mã đơn trong nội dung, cộng dồn tiền đã nhận.
 5. Đủ tiền → đơn chuyển sang đã thanh toán; màn hóa đơn (hỏi lại mỗi 3 giây) báo "Đã nhận đủ tiền", đơn hiện ở quầy pha.

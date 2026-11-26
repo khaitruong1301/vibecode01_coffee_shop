@@ -17,7 +17,7 @@ export class BankTransactionDto {
   transferType: string;
   /** @example 45000 */
   amount: number;
-  /** @example "NGUYEN VAN A chuyen tien CP000001" */
+  /** @example "NGUYEN VAN A chuyen tien CF000001" */
   content: string;
   /** @example "MBVCB.3278907687" */
   referenceCode: string | null;

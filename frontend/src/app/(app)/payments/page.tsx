@@ -102,7 +102,12 @@ function WebhookSetup({ settings }: { settings: PaymentSettings }) {
           <code>Authorization: Apikey …</code>).
         </li>
         <li>
-          Khách chuyển khoản với nội dung <code>CP000123</code> (in trên mã QR của từng đơn) — đơn tự chuyển sang “Đã thanh toán”.
+          <b>Cấu trúc mã thanh toán</b> (Cấu hình công ty → Cấu hình chung) — tiền tố <b>CF</b>, hậu tố từ <b>6</b> đến{' '}
+          <b>10</b> ký tự, kiểu <b>Số nguyên</b>. Nếu webhook bật “Chỉ gửi khi có mã thanh toán” mà thiếu cấu hình này thì
+          SePay không gửi giao dịch về.
+        </li>
+        <li>
+          Khách chuyển khoản với nội dung <code>CF000123</code> (in trên mã QR của từng đơn) — đơn tự chuyển sang “Đã thanh toán”.
         </li>
       </ol>
     </section>
