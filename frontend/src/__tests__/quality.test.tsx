@@ -95,6 +95,43 @@ describe('Trang báo cáo kiểm thử (/quality)', () => {
     expect(screen.getByText('Chưa chạy — `npm run test:report` (cần Docker).', { exact: false })).toBeInTheDocument();
   });
 
+  it('test vừa thay đổi: khung "Vừa thay đổi" ở đầu, nhãn Mới / Vừa sửa bằng chữ, hạng mục có huy hiệu, lọc được', async () => {
+    const tests = [
+      { ...REPORT.tests[0], recent: 'changed' as const },
+      REPORT.tests[1],
+      { ...REPORT.tests[2], name: 'GET /api/reports/revenue — chủ quán 200', status: 'pass' as const, recent: 'new' as const },
+    ];
+    mockReport(200, {
+      ...REPORT,
+      tests,
+      categories: REPORT.categories.map((c) => ({ ...c, recent: c.id === 9 ? 1 : c.id === 2 ? 1 : 0 })),
+      recent: { branch: 'feat/revenue-dashboard', base: 'origin/main', previousGeneratedAt: '2026-11-19T13:00:00.000Z', files: ['backend/src/pricing/pricing.spec.ts', 'backend/test/security.e2e-spec.ts'], changed: 2, new: 1 },
+    });
+    render(<QualityPage />);
+
+    const box = (await screen.findByRole('heading', { name: '★ Vừa thay đổi' })).closest('section') as HTMLElement;
+    expect(box).toHaveTextContent('2 test trong 2 file vừa sửa · 1 test mới · 2 đạt');
+    expect(box).toHaveTextContent('feat/revenue-dashboard so với origin/main');
+    const items = within(within(box).getByRole('region', { name: 'Danh sách test vừa thay đổi' })).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([expect.stringMatching(/^✓Đạt★Mới.*reports\/revenue/), expect.stringMatching(/^✓Đạt✎Vừa sửa.*size L/)]);
+
+    const row = screen.getByRole('button', { name: /Security Testing/ }).closest('tr') as HTMLElement;
+    expect(row).toHaveTextContent('1 vừa thay đổi');
+    await userEvent.click(screen.getByRole('button', { name: /Security Testing/ }));
+    const list = screen.getAllByRole('region', { name: 'Danh sách test' }).at(-1) as HTMLElement;
+    expect(within(list).getAllByRole('listitem')[0]).toHaveTextContent('Mới'); // test vừa thay đổi lên đầu
+    await userEvent.click(screen.getAllByRole('button', { name: '★ Vừa thay đổi (1)' }).at(-1) as HTMLElement);
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('báo cáo cũ không có thông tin thay đổi → không hiện khung, không có bộ lọc', async () => {
+    mockReport(200, REPORT);
+    render(<QualityPage />);
+    await screen.findByRole('heading', { name: /Kiểm thử tự động/ });
+    expect(screen.queryByRole('heading', { name: '★ Vừa thay đổi' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/vừa thay đổi/)).not.toBeInTheDocument();
+  });
+
   it('#15 CI: hiện lần chạy trên GitHub kèm link và trạng thái từng job', async () => {
     mockReport(200, {
       ...REPORT,

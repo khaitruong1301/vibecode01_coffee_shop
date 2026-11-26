@@ -47,6 +47,7 @@ export function setupSwagger(app: INestApplication) {
     .addTag('Sản phẩm', 'UC06 — menu, danh mục, thêm món, sửa giá')
     .addTag('Đơn hàng', 'UC02–UC05 — tạo đơn, hóa đơn, quầy pha')
     .addTag('Thanh toán', 'UC07 — chuyển khoản QR, webhook SePay')
+    .addTag('Báo cáo', 'UC08 — dashboard doanh thu — chỉ Chủ quán')
     .addTag('Kiểm thử', 'Báo cáo kiểm thử tự động — chỉ Chủ quán')
     .build();
 

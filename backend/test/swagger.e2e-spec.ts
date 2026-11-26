@@ -64,6 +64,7 @@ describe('Swagger (e2e)', () => {
     expect(doc.paths['/api/products/{id}'].patch.responses).toHaveProperty('403');
     expect(doc.paths['/api/orders/{id}/status'].patch.responses).toHaveProperty('403');
     expect(doc.paths['/api/quality/report'].get.responses).toHaveProperty('403');
+    expect(doc.paths['/api/reports/revenue'].get.responses).toHaveProperty('403');
     expect(doc.paths['/api/orders/{code}'].get.responses).not.toHaveProperty('403');
   });
 

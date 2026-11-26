@@ -21,6 +21,7 @@ const MATRIX: { method: 'get' | 'post' | 'patch'; path: string; body?: object; r
   { method: 'get', path: '/api/payments/transactions', roles: ['cashier', 'admin'] },
   { method: 'get', path: '/api/payments/settings', roles: ['cashier', 'barista', 'admin'] },
   { method: 'get', path: '/api/quality/report', roles: ['admin'] },
+  { method: 'get', path: '/api/reports/revenue', roles: ['admin'] },
   { method: 'patch', path: '/api/auth/password', body: {}, roles: ['cashier', 'barista', 'admin'] },
 ];
 

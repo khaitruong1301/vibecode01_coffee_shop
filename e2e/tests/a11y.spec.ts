@@ -55,6 +55,20 @@ test.describe('Accessibility (WCAG 2.1 AA)', () => {
     await audit(page, '/payments');
   });
 
+  test('doanh thu (chủ quán — KPI, biểu đồ, tooltip)', async ({ page }) => {
+    await login(page, 'chuquan', /\/products$/);
+    await page.goto('/checkout');
+    await addToCart(page, 'Bánh tiramisu');
+    await page.getByRole('button', { name: /Thanh toán/ }).click();
+    await expect(page).toHaveURL(/\/receipt\//);
+    await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Hôm nay' }).click();
+    const hours = page.getByRole('list', { name: 'Doanh thu theo giờ' });
+    await expect(hours).toBeVisible();
+    await hours.getByRole('listitem').first().focus(); // tooltip đang mở cũng phải đạt
+    await audit(page, '/dashboard');
+  });
+
   test('quầy pha', async ({ page }) => {
     await login(page, 'phache1', /\/barista$/);
     await audit(page, '/barista');

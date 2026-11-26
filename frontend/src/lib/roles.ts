@@ -11,6 +11,7 @@ export const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: '/checkout', label: 'Bán hàng', roles: ['cashier', 'admin'] },
   { href: '/barista', label: 'Quầy pha', roles: ['barista', 'admin'] },
   { href: '/payments', label: 'Chuyển khoản', roles: ['cashier', 'admin'] },
+  { href: '/dashboard', label: 'Doanh thu', roles: ['admin'] },
   { href: '/products', label: 'Sản phẩm', roles: ['admin'] },
   { href: '/quality', label: 'Kiểm thử', roles: ['admin'] },
 ];

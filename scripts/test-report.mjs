@@ -160,6 +160,35 @@ function parseJUnit(suite) {
 const suites = SUITES.map(parseJUnit);
 const allTests = suites.flatMap((s) => s.tests);
 
+// ---------------------------------------------------------------- test vừa thay đổi (tô sáng trên /quality)
+// "changed": file test đã sửa trên nhánh hiện tại so với main (gồm cả phần chưa commit, file mới);
+// "new": thêm vào đó, tên test chưa có trong báo cáo lần trước.
+function git(gitArgs) {
+  const r = spawnSync('git', gitArgs, { cwd: ROOT, encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.trim() : '';
+}
+const REPO_PREFIX = { 'backend-unit': 'backend/', 'backend-e2e': 'backend/', frontend: 'frontend/', playwright: 'e2e/tests/' };
+const previous = readJson(REPORT_FILE, null);
+const previousKeys = new Set((previous?.tests ?? []).map((t) => `${t.suite}|${t.file}|${t.name}`));
+const baseRef = ['origin/main', 'main'].find((ref) => git(['rev-parse', '--verify', '--quiet', ref]));
+const base = baseRef ? git(['merge-base', 'HEAD', baseRef]) : '';
+const changedFiles = new Set(
+  [...(base ? git(['diff', '--name-only', base]).split('\n') : []), ...git(['ls-files', '--others', '--exclude-standard']).split('\n')].filter(Boolean),
+);
+for (const t of allTests) {
+  if (!changedFiles.has(`${REPO_PREFIX[t.suite] ?? ''}${t.file}`)) continue;
+  t.recent = previous && !previousKeys.has(`${t.suite}|${t.file}|${t.name}`) ? 'new' : 'changed';
+}
+const recentTests = allTests.filter((t) => t.recent);
+const recent = {
+  branch: git(['rev-parse', '--abbrev-ref', 'HEAD']) || null,
+  base: baseRef ?? null,
+  previousGeneratedAt: previous?.generatedAt ?? null,
+  files: [...new Set(recentTests.map((t) => `${REPO_PREFIX[t.suite] ?? ''}${t.file}`))].sort(),
+  changed: recentTests.length,
+  new: recentTests.filter((t) => t.recent === 'new').length,
+};
+
 // ---------------------------------------------------------------- coverage, load, smoke, CI
 function thresholdsFromVitest() {
   try {
@@ -267,7 +296,7 @@ const categories = CATALOG.map((c) => {
   else if (!tests.length && !checks.length) status = 'not_run';
   else status = tests.some((t) => t.status === 'fail') || checks.some((x) => x.status === 'fail') ? 'fail' : 'pass';
   const { tests: _pred, runs: _runs, ...meta } = c;
-  return { ...meta, status, counts: count(tests), checks, testIds: tests.map((t) => allTests.indexOf(t)) };
+  return { ...meta, status, counts: count(tests), recent: tests.filter((t) => t.recent).length, checks, testIds: tests.map((t) => allTests.indexOf(t)) };
 });
 
 const totals = count(allTests);
@@ -285,6 +314,7 @@ const report = {
   categories,
   suites: suites.map(({ tests, ...s }) => ({ ...s, ...count(tests) })),
   tests: allTests,
+  recent,
   runs: Object.values(runs),
   smoke: smokeChecks,
   coverage,

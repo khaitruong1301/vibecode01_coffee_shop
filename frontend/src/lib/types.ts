@@ -127,6 +127,8 @@ export interface TestCase {
   status: TestStatus;
   durationMs: number;
   message?: string;
+  /** Test vừa thay đổi: file test đã sửa trên nhánh hiện tại so với main; `new` = tên chưa có ở báo cáo trước. */
+  recent?: 'new' | 'changed';
 }
 
 export interface RunCheck {
@@ -150,6 +152,8 @@ export interface TestCategory {
   counts: TestCounts;
   checks: RunCheck[];
   testIds: number[];
+  /** Số test vừa thay đổi trong hạng mục (báo cáo cũ không có). */
+  recent?: number;
 }
 
 export interface CoverageMetric {
@@ -182,6 +186,8 @@ export interface QualityReport {
   categories: TestCategory[];
   suites: (TestCounts & { id: string; label: string; present: boolean; ranAt: string | null })[];
   tests: TestCase[];
+  /** Tóm tắt test vừa thay đổi (báo cáo cũ không có). */
+  recent?: { branch: string | null; base: string | null; previousGeneratedAt: string | null; files: string[]; changed: number; new: number };
   smoke: { name: string; status: 'pass' | 'fail' }[];
   coverage: { id: string; label: string; present: boolean; ranAt?: string; metrics: CoverageMetric[] }[];
   perf: {
@@ -200,4 +206,24 @@ export interface QualityReport {
   };
   findings: { by: string; issue: string; fix: string }[];
   recommendations: string[];
+}
+
+/** GET /api/reports/revenue — dashboard doanh thu (UC08). Chỉ đơn đã thanh toán, ngày giờ Việt Nam. */
+export interface RevenueTotals {
+  revenue: number;
+  orders: number;
+  itemsSold: number;
+  avgOrderValue: number;
+}
+
+export interface RevenueReport {
+  from: string;
+  to: string;
+  summary: RevenueTotals & { previous: RevenueTotals };
+  byDay: { date: string; revenue: number; orders: number }[];
+  byHour: { hour: number; revenue: number; orders: number }[];
+  bySource: { source: OrderSource; revenue: number; orders: number }[];
+  byPaymentMethod: { paymentMethod: PaymentMethod; revenue: number; orders: number }[];
+  byCategory: { category: string; revenue: number; quantity: number }[];
+  topProducts: { productId: number; name: string; revenue: number; quantity: number }[];
 }
