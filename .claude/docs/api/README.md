@@ -53,6 +53,7 @@ Base URL: `http://localhost:4100/api` (trực tiếp) · `http://localhost:3100/
 | POST | `/payments/sepay/webhook` | công khai + API key | SePay báo giao dịch; luôn trả `{ "success": true }` khi đã ghi nhận | UC07 |
 | GET | `/payments/transactions` | cashier, admin | giao dịch SePay đã nhận, mới nhất trước, `?limit=` ≤ 500 (mặc định 100) | UC07 |
 | GET | `/payments/settings` | đã đăng nhập | có bật chuyển khoản không, tài khoản nhận tiền, webhook đã có key chưa (không trả key) | UC07 |
+| GET | `/reports/revenue` | admin | dashboard doanh thu theo khoảng ngày `?from=&to=` (YYYY-MM-DD, giờ Việt Nam; mặc định 7 ngày gần nhất, tối đa 366 ngày): tổng quan + kỳ trước, theo ngày, giờ, nguồn đơn, phương thức thanh toán, danh mục, top 10 món | UC08 |
 | GET | `/quality/report` | admin | báo cáo kiểm thử tự động (đọc `reports/test-report.json`); chưa có → 404, file hỏng → 500 | — |
 
 ## 3. Chi tiết
@@ -173,3 +174,29 @@ Authorization: Apikey <SEPAY_WEBHOOK_KEY>
 `transferEnabled` = có đủ ngân hàng + số tài khoản + webhook key.
 
 **200** `{ "transferEnabled": true, "bank": "MBBank", "accountNo": "0123456789", "accountName": "QUAN CA PHE ABC", "webhookKeyConfigured": true, "webhookPath": "/api/payments/sepay/webhook" }`
+
+### GET `/reports/revenue` (UC08)
+
+Chỉ chủ quán (thu ngân, pha chế → 403). Doanh thu = tổng `total` của đơn **đã thanh toán** (`payment_status = paid`), xếp theo thời điểm thanh toán `paid_at` — đơn chuyển khoản chưa nhận đủ tiền chưa tính (BR06). Ngày, giờ theo giờ Việt Nam (UTC+7). Xử lý khoảng ngày: `backend/src/reports/report-range.ts` (hàm thuần, có unit test).
+
+| Query | Ý nghĩa |
+|---|---|
+| `from`, `to` | `YYYY-MM-DD`, tính cả hai đầu. Bỏ trống cả hai → 7 ngày gần nhất (tới hôm nay); thiếu một đầu → 7 ngày tính từ / tới đầu còn lại |
+
+**200**
+```json
+{
+  "from": "2026-11-20", "to": "2026-11-26",
+  "summary": { "revenue": 4250000, "orders": 98, "itemsSold": 176, "avgOrderValue": 43367,
+               "previous": { "revenue": 3900000, "orders": 90, "itemsSold": 160, "avgOrderValue": 43333 } },
+  "byDay": [{ "date": "2026-11-20", "revenue": 612000, "orders": 14 }],
+  "byHour": [{ "hour": 7, "revenue": 980000, "orders": 23 }],
+  "bySource": [{ "source": "counter", "revenue": 3100000, "orders": 72 }],
+  "byPaymentMethod": [{ "paymentMethod": "cash", "revenue": 2600000, "orders": 61 }],
+  "byCategory": [{ "category": "Cà phê", "revenue": 2100000, "quantity": 70 }],
+  "topProducts": [{ "productId": 2, "name": "Cà phê sữa đá", "revenue": 1250000, "quantity": 42 }]
+}
+```
+- `previous`: kỳ trước cùng số ngày, liền trước `from`.
+- `byDay` đủ mọi ngày, `byHour` đủ 24 giờ, `bySource` đủ 3 nguồn, `byPaymentMethod` đủ 2 phương thức (không có đơn = 0). `byCategory` theo danh mục **hiện tại** của món, `topProducts` tối đa 10 món, đều xếp doanh thu cao trước.
+- **400** `from`/`to` sai định dạng (kèm `details`), ngày không có thật (30/02), `from` sau `to`, quá 366 ngày.

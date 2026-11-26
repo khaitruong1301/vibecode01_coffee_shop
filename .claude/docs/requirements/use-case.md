@@ -18,7 +18,7 @@ Wireframe màn hình (draw.io, 9 trang): `../ui-ux/wireframe-man-hinh.drawio`
 | Nhân viên | trừu tượng | Đăng nhập; là cha của 3 vai bên dưới |
 | Thu ngân | chính | Chọn món, size, thanh toán, in hóa đơn |
 | Pha chế | chính | Nhận đơn ở màn quầy pha |
-| Chủ quán (admin) | chính | Sửa giá, thêm món |
+| Chủ quán (admin) | chính | Sửa giá, thêm món, xem doanh thu |
 | GrabFood / ShopeeFood | hệ thống ngoài | Nguồn đơn giao đồ ăn |
 | SePay | hệ thống ngoài | Báo giao dịch chuyển khoản vào tài khoản ngân hàng của quán (webhook) |
 
@@ -36,7 +36,9 @@ Wireframe màn hình (draw.io, 9 trang): `../ui-ux/wireframe-man-hinh.drawio`
 | UC06 | Quản lý sản phẩm (thêm món, sửa giá) | Chủ quán | `/products` → `GET/POST/PATCH /api/products` |
 | UC07 | Thanh toán chuyển khoản QR (SePay) | Thu ngân, Chủ quán, SePay | `/checkout` chọn Chuyển khoản → `/receipt/CP-…` hiện QR · `POST /api/payments/sepay/webhook` · `/payments` → `GET /api/payments/transactions` |
 
-Quan hệ: UC02, UC04, UC05, UC06 `<<include>>` UC01 · UC03 `<<extend>>` UC02 · UC07 `<<extend>>` UC02 · "Chọn size" `<<extend>>` "Chọn món".
+| UC08 | Xem dashboard doanh thu | Chủ quán | `/dashboard` (menu "Doanh thu") → `GET /api/reports/revenue` |
+
+Quan hệ: UC02, UC04, UC05, UC06, UC08 `<<include>>` UC01 · UC03 `<<extend>>` UC02 · UC07 `<<extend>>` UC02 · "Chọn size" `<<extend>>` "Chọn món".
 
 ## 4. Đặc tả UC02 — Bán hàng tại quầy
 
@@ -88,6 +90,25 @@ Quan hệ: UC02, UC04, UC05, UC06 `<<include>>` UC01 · UC03 `<<extend>>` UC02 �
 
 _Chưa có_: huỷ đơn chờ chuyển khoản bị bỏ dở; cảnh báo số tiền chuyển thừa cần hoàn.
 
+## 4c. Đặc tả UC08 — Xem dashboard doanh thu
+
+| Mục | Nội dung |
+|---|---|
+| Tác nhân | Chủ quán |
+| Tiền điều kiện | Đã đăng nhập vai `admin` (thu ngân / pha chế → 403, không thấy menu) |
+| Hậu điều kiện | Không ghi dữ liệu |
+
+Luồng chính:
+1. Chủ quán mở menu **Doanh thu** → mặc định 7 ngày gần nhất.
+2. Chọn nhanh Hôm nay / 7 ngày / 30 ngày / Tháng này / Tháng trước, hoặc nhập Từ ngày – Đến ngày.
+3. Server tính trên đơn **đã thanh toán**, theo thời điểm thanh toán, ngày giờ Việt Nam; trả tổng quan + kỳ trước cùng độ dài.
+4. Màn hình hiện 4 ô số liệu (doanh thu, số đơn, trung bình mỗi đơn, số ly / món) kèm ▲ tăng / ▼ giảm so với kỳ trước; biểu đồ doanh thu theo ngày, theo giờ (cao điểm để xếp ca), theo nguồn đơn, phương thức thanh toán, danh mục, top 10 món; mỗi biểu đồ có bảng số liệu.
+
+Luồng phụ:
+- 2a. Từ ngày sau Đến ngày / ngày không có thật / quá 366 ngày → 400, hiện lỗi + Thử lại.
+- 3a. Khoảng không có đơn → các ô = 0, lời nhắc chọn khoảng khác, không vẽ biểu đồ.
+- 3b. Đơn chuyển khoản chưa nhận đủ tiền không tính vào doanh thu (BR06); tính vào ngày khách trả đủ.
+
 ## 5. Luật bán hàng
 
 | Mã | Luật |
@@ -117,6 +138,7 @@ Bản NestJS trong repo đã chặn cả 3 lỗi; test tương ứng nằm trong
 | BR04 | Guard toàn cục `JwtAuthGuard` (mọi route cần đăng nhập) + `@Roles('cashier', 'admin')` trên `POST /orders` |
 | L3 | DTO không có field giá; ValidationPipe `whitelist` loại field lạ |
 | Luồng pha chế | `backend/src/orders/order-status.ts`: Chờ pha → Đang pha → Xong — chờ giao → Đã giao, không nhảy bước |
+| UC08 | `backend/src/reports/report-range.ts` (khoảng ngày giờ Việt Nam, kỳ trước — hàm thuần) + `reports.service.ts` (chỉ đơn `paid`, theo `paid_at`) |
 | BR06, UC07 | `backend/src/payments/payment-rules.ts` (hàm thuần `findOrderId`, `reconcile`) + `orders.service.ts` (lọc `payment_status = paid`, chặn chuyển trạng thái) + CHECK `orders_unpaid_not_prepared` |
 
 ## 8. Câu hỏi của chủ quán

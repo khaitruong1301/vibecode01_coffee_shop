@@ -19,6 +19,7 @@ Theo dõi tổng thể: `TEST_CHECKLIST.md` (gốc repo). CI: `.github/workflows
 - Tên test gắn mã nghiệp vụ (`BR02`, `L1`, `UC05`…) — `npm run test:regression` lọc theo các mã này.
 - Luật mới → unit test; API mới → thêm dòng vào ma trận `backend/test/auth.e2e-spec.ts` + test API; trang mới → Playwright + `a11y.spec.ts`.
 - Lỗi phát hiện được thì viết test tái hiện trước rồi mới sửa; tính năng chưa có thì dùng `it.todo`, không viết test "pass giả".
+- Báo cáo `npm run test:report` đánh dấu **test vừa thay đổi** (`recent` trong `reports/test-report.json`): test nằm trong file đã sửa trên nhánh hiện tại so với `origin/main` (gồm phần chưa commit, file mới) → `changed`; thêm điều kiện tên chưa có ở báo cáo lần trước → `new`. Trang `/quality` tô sáng các test này. Muốn "Mới" đúng nghĩa thì tạo báo cáo một lần trên `main` trước khi làm nhánh mới.
 - Frontend: tìm phần tử theo vai trò / nhãn (`getByRole`, `getByLabelText`), không theo class CSS.
 - Ngưỡng coverage (CI đỏ nếu tụt): backend unit 95/85/95/95, backend e2e 90/75/85/90, frontend 85/80/75/85 (lines/branches/functions/statements).
 - Coverage e2e bỏ `src/config.ts`: các nhánh `process.env.X ?? mặc định` phụ thuộc biến môi trường của máy chạy (CI có `JWT_SECRET`, máy dev thì không) nên số liệu lệch giữa local và CI. Logic kiểm tra cấu hình production đã có unit test `config.spec.ts`.

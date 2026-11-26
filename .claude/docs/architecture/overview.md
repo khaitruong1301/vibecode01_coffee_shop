@@ -49,7 +49,8 @@ backend/
     payments/               UC07: webhook SePay (SepayApiKeyGuard), đối soát giao dịch (payment-rules.ts), danh sách giao dịch
     health/                 GET /api/health
     quality/                GET /api/quality/report — đọc reports/test-report.json
-    seed/                   dữ liệu mẫu (chỉ nạp khi DB trống)
+    reports/                UC08: GET /api/reports/revenue — doanh thu cho dashboard (report-range.ts: khoảng ngày giờ Việt Nam)
+    seed/                   dữ liệu mẫu (chỉ nạp khi DB trống) · demo-orders.ts (đơn mẫu cho dashboard, chỉ dev)
     generated/prisma/       Prisma Client sinh ra (không commit)
   test/                     e2e (orders.e2e-spec.ts), global-setup, setup-env
   Dockerfile · docker-entrypoint.sh (migrate deploy → seed → node dist/main.js)
@@ -66,6 +67,7 @@ frontend/
     (app)/quality/          báo cáo kiểm thử (chỉ admin)
     (app)/account/          tài khoản — đổi mật khẩu (mọi vai trò)
     (app)/payments/         chuyển khoản — giao dịch SePay, hướng dẫn tạo webhook (UC07)
+    (app)/dashboard/        doanh thu — KPI + biểu đồ (charts.tsx: ColumnChart, BarList, ChartCard), chỉ admin (UC08)
     globals.css · icon.svg · layout.tsx
   src/components/           ui.tsx, AuthProvider.tsx, Navbar.tsx
   src/lib/                  api.ts, format.ts, roles.ts, types.ts
@@ -80,6 +82,8 @@ frontend/
 | products | `/api/products`, `/api/categories` | UC02, UC06 |
 | orders | `/api/orders` | UC02–UC05 |
 | health | `/api/health` | — |
+| payments | `/api/payments/*` | UC07 |
+| reports | `/api/reports/revenue` (chỉ admin) | UC08 |
 | quality | `/api/quality/report` (chỉ admin) | báo cáo kiểm thử |
 
 ## 5. Cổng & biến môi trường
@@ -121,6 +125,7 @@ frontend/
 | backend | `npm test` | unit test (`src/**/*.spec.ts`) |
 | backend | `npm run test:e2e` | migrate DB test rồi chạy e2e |
 | backend | `npm run db:migrate` / `db:deploy` / `db:seed` | Prisma migrate dev / deploy / nạp dữ liệu mẫu |
+| backend | `npm run db:seed-demo` (`-- --days 60` · `-- --clear`) | **chỉ dev** (từ chối khi `APP_ENV=production`): thêm đơn mẫu đã thanh toán cho N ngày gần nhất (mặc định 30, ~115–150 đơn/ngày, cao điểm 7h–9h) để xem dashboard; giá tính bằng `pricing.ts`; đơn mẫu ghi chú `[demo]`, `--clear` xoá |
 | frontend | `npm run dev` / `build` / `start` | Next cổng 3100 |
 | frontend | `npm run typecheck` / `lint` | tsc / ESLint (core-web-vitals) |
 | gốc | `docker compose up -d --build` | build + chạy cả 3 dịch vụ |

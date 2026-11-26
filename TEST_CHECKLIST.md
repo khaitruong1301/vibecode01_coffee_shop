@@ -10,7 +10,7 @@ Lần chạy gần nhất: **20/11/2026** (máy local, Node 22.17, Docker Deskto
 
 ## 0. Xem trên web (chỉ Chủ quán)
 
-Trang **`/quality`** trong CoffeePOS (menu "Kiểm thử", chỉ tài khoản admin `chuquan`) hiển thị báo cáo mới nhất: ô tổng quan, 15 hạng mục (mở từng hạng mục để xem từng test case, lọc Không đạt / Chưa làm, đọc lỗi), coverage có vạch ngưỡng, load test, smoke, lần chạy CI trên GitHub, lỗi đã phát hiện và khuyến nghị.
+Trang **`/quality`** trong CoffeePOS (menu "Kiểm thử", chỉ tài khoản admin `chuquan`) hiển thị báo cáo mới nhất: ô tổng quan, khung **★ Vừa thay đổi** (test trong file đã sửa trên nhánh hiện tại so với `main`, nhãn ★ Mới / ✎ Vừa sửa, cũng tô sáng trong từng hạng mục), 15 hạng mục (mở từng hạng mục để xem từng test case, lọc Không đạt / Chưa làm, đọc lỗi), coverage có vạch ngưỡng, load test, smoke, lần chạy CI trên GitHub, lỗi đã phát hiện và khuyến nghị.
 
 - Dữ liệu: `reports/test-report.json`, sinh bởi `scripts/test-report.mjs` từ kết quả thật (Jest JSON, JUnit của Vitest/Playwright, coverage-summary, perf.json, output smoke, `gh run list`).
 - Cập nhật: `npm run test:report` (đầy đủ, cần Docker) · `npm run test:report:quick` (bỏ phần Docker, giữ kết quả cũ của chúng) · `npm run test:report:build` (chỉ gom lại). Sau đó bấm **Tải lại** trên trang.

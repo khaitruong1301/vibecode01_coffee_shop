@@ -40,6 +40,16 @@ Nhãn trạng thái: Chờ pha · Đang pha · Xong — chờ giao · Đã giao 
 
 Khác: `AuthProvider` (phiên + `useRequireRole`), `Navbar` (menu theo vai trò, ẩn khi in).
 
+Biểu đồ (`frontend/src/app/(app)/dashboard/charts.tsx`, chỉ dùng cho dashboard) — vẽ bằng HTML/CSS, không thêm thư viện:
+
+| Component | Ghi chú |
+|---|---|
+| `ColumnChart` | cột theo thời gian, một chuỗi số liệu màu `primary` (đang rê / focus: `primary-hover`), lưới gạch `border`, trục y 3 mốc làm tròn (`niceMax`, tiền rút gọn `formatVndCompact`: 1,5tr · 350k), tooltip `role="status"`; mỗi cột là `li` focus được, có tên đọc đầy đủ |
+| `BarList` | thanh ngang so sánh độ lớn: nhãn + số + dòng phụ ghi thẳng (không cần chú giải), rãnh `secondary`, thanh `primary` |
+| `ChartCard` | khung biểu đồ: tiêu đề, gợi ý, "Xem bảng số liệu" (`details` + bảng trong vùng cuộn focus được) |
+
+Một màu dữ liệu duy nhất (`primary`) vì mỗi biểu đồ chỉ một chuỗi; tăng / giảm luôn có ▲ / ▼ + chữ, không chỉ dựa vào màu `success` / `danger`.
+
 ## 4. Màn hình
 
 | Route | Vai trò | Nội dung | UC |
@@ -51,7 +61,8 @@ Khác: `AuthProvider` (phiên + `useRequireRole`), `Navbar` (menu theo vai trò,
 | `/payments` | cashier, admin | Menu "Chuyển khoản": mục "Đơn chờ chuyển khoản" (link mở lại QR, đã nhận / tổng) khi có; bảng giao dịch SePay (thời gian, ±số tiền, nội dung, link đơn, nhãn kết quả có biểu tượng), tự làm mới 10 giây; chủ quán thấy thêm khung "Kết nối SePay" (trạng thái cấu hình + URL webhook để chép + cách điền form SePay, cấu trúc mã thanh toán tiền tố CF) | UC07 |
 | `/barista` | barista, admin | 3 cột Chờ pha / Đang pha / Xong — chờ giao, tự làm mới 5 giây, không hiện giá | UC05 |
 | `/account` | đã đăng nhập | Thông tin tài khoản + đổi mật khẩu (kiểm tra phía client, lỗi theo từng ô, báo thu hồi phiên thiết bị khác); mở bằng tên người dùng trên thanh menu | UC01 |
-| `/quality` | admin | Báo cáo kiểm thử: ô tổng quan, 15 hạng mục (mở xem từng test, lọc Không đạt / Chưa làm), coverage có vạch ngưỡng, load test, smoke, lần chạy CI trên GitHub, lỗi phát hiện, khuyến nghị; chưa có báo cáo → hướng dẫn `npm run test:report` | — |
+| `/dashboard` | admin | Menu "Doanh thu": chọn nhanh Hôm nay / 7 ngày / 30 ngày / Tháng này / Tháng trước + ô Từ ngày – Đến ngày; 4 ô số liệu (doanh thu, số đơn, trung bình mỗi đơn, số ly / món) kèm ▲ Tăng / ▼ Giảm / = Không đổi so với kỳ trước; biểu đồ cột doanh thu theo ngày (khi > 1 ngày) và theo giờ (tooltip khi rê chuột / Tab); thanh ngang theo nguồn đơn, phương thức thanh toán, danh mục, top 10 món (nhãn + số + tỉ lệ ghi thẳng); mỗi biểu đồ có "Xem bảng số liệu"; khoảng không có đơn → lời nhắc | UC08 |
+| `/quality` | admin | Báo cáo kiểm thử: ô tổng quan, khung **★ Vừa thay đổi** (test trong file đã sửa trên nhánh hiện tại so với `main`, nhãn ★ Mới / ✎ Vừa sửa, viền trái `primary` + nền `secondary`, lên đầu danh sách; hạng mục có huy hiệu "N vừa thay đổi", lọc "★ Vừa thay đổi"), 15 hạng mục (mở xem từng test, lọc Không đạt / Chưa làm), coverage có vạch ngưỡng, load test, smoke, lần chạy CI trên GitHub, lỗi phát hiện, khuyến nghị; chưa có báo cáo → hướng dẫn `npm run test:report` | — |
 | `/products` | admin | Bảng món (giá S/M, giá L tự tính, người sửa cuối), lọc, ẩn/mở bán; hộp thoại thêm/sửa có "Xem thử tính tiền" | UC06 |
 
 ## 5. Thuật ngữ thống nhất

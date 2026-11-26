@@ -36,6 +36,19 @@ function StatusBadge({ status }: { status: keyof typeof STATUS }) {
   );
 }
 
+/** Nhãn test vừa thay đổi — biểu tượng + chữ. */
+function RecentBadge({ recent }: { recent: NonNullable<TestCase['recent']> }) {
+  return recent === 'new' ? (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">
+      <span aria-hidden>★</span>Mới
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-primary px-2.5 py-0.5 text-xs font-semibold text-primary">
+      <span aria-hidden>✎</span>Vừa sửa
+    </span>
+  );
+}
+
 function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div role="group" aria-label={label} className="rounded-xl border border-border bg-surface p-4">
@@ -89,32 +102,48 @@ function Section({ title, children, aside }: { title: string; children: React.Re
   );
 }
 
-function TestList({ tests }: { tests: TestCase[] }) {
-  const [filter, setFilter] = useState<'all' | 'fail' | 'todo'>('all');
+const RECENT_ORDER = { new: 0, changed: 1 } as const;
+
+function TestList({ tests, label = 'Danh sách test' }: { tests: TestCase[]; label?: string }) {
+  const recentCount = tests.filter((t) => t.recent).length;
+  const [filter, setFilter] = useState<'all' | 'recent' | 'fail' | 'todo'>('all');
   const [q, setQ] = useState('');
-  const shown = tests.filter(
-    (t) =>
-      (filter === 'all' || (filter === 'fail' ? t.status === 'fail' : t.status === 'todo' || t.status === 'skip')) &&
-      (!q || t.name.toLowerCase().includes(q.toLowerCase())),
-  );
+  // Test vừa thay đổi lên đầu (mới trước, vừa sửa sau), còn lại giữ thứ tự cũ.
+  const shown = tests
+    .filter(
+      (t) =>
+        (filter === 'all' ||
+          (filter === 'recent' ? !!t.recent : filter === 'fail' ? t.status === 'fail' : t.status === 'todo' || t.status === 'skip')) &&
+        (!q || t.name.toLowerCase().includes(q.toLowerCase())),
+    )
+    .map((t, i) => ({ t, i }))
+    .sort((a, b) => (a.t.recent ? RECENT_ORDER[a.t.recent] : 2) - (b.t.recent ? RECENT_ORDER[b.t.recent] : 2) || a.i - b.i)
+    .map(({ t }) => t);
   if (!tests.length) return null;
+  const filters = recentCount ? (['all', 'recent', 'fail', 'todo'] as const) : (['all', 'fail', 'todo'] as const);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        {(['all', 'fail', 'todo'] as const).map((f) => (
+        {filters.map((f) => (
           <Chip key={f} active={filter === f} onClick={() => setFilter(f)}>
-            {{ all: `Tất cả (${tests.length})`, fail: `Không đạt (${tests.filter((t) => t.status === 'fail').length})`, todo: `Chưa làm / bỏ qua (${tests.filter((t) => t.status === 'todo' || t.status === 'skip').length})` }[f]}
+            {{ all: `Tất cả (${tests.length})`, recent: `★ Vừa thay đổi (${recentCount})`, fail: `Không đạt (${tests.filter((t) => t.status === 'fail').length})`, todo: `Chưa làm / bỏ qua (${tests.filter((t) => t.status === 'todo' || t.status === 'skip').length})` }[f]}
           </Chip>
         ))}
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm test…" aria-label="Tìm test" className="h-9 w-full sm:w-64" />
       </div>
-      <ScrollArea label="Danh sách test" className="max-h-96 overflow-y-auto rounded-lg border border-border">
+      <ScrollArea label={label} className="max-h-96 overflow-y-auto rounded-lg border border-border">
       <ul className="divide-y divide-border">
         {shown.length === 0 && <li className="px-3 py-4 text-center text-sm text-muted">Không có test phù hợp.</li>}
         {shown.map((t, i) => (
-          <li key={`${t.file}-${t.name}-${i}`} className="px-3 py-2 text-sm">
+          <li
+            key={`${t.file}-${t.name}-${i}`}
+            className={`px-3 py-2 text-sm ${t.recent ? 'border-l-4 border-primary bg-secondary/60' : 'border-l-4 border-transparent'}`}
+          >
             <div className="flex items-start gap-2">
-              <StatusBadge status={t.status} />
+              <span className="flex shrink-0 flex-col items-start gap-1">
+                <StatusBadge status={t.status} />
+                {t.recent && <RecentBadge recent={t.recent} />}
+              </span>
               <div className="min-w-0 flex-1">
                 <p className="break-words">{t.name}</p>
                 <p className="text-xs text-muted">
@@ -261,6 +290,28 @@ export default function QualityPage() {
         <StatTile label="Hạng mục đạt" value={`${s.categoriesPassed}/${s.categoriesTotal}`} sub="còn lại: gộp / đã cấu hình" />
       </div>
 
+      {report.recent && report.recent.changed > 0 && (
+        <Section
+          title="★ Vừa thay đổi"
+          aside={`${report.recent.branch ?? 'nhánh hiện tại'} so với ${report.recent.base ?? 'main'}${report.recent.previousGeneratedAt ? ` · "Mới" = chưa có ở báo cáo ${formatDateTime(report.recent.previousGeneratedAt)}` : ''}`}
+        >
+          <div className="space-y-3">
+            <p className="text-sm">
+              <b className="tabular">{report.recent.changed}</b> test trong <b className="tabular">{report.recent.files.length}</b> file vừa sửa · <b className="tabular">{report.recent.new}</b> test mới ·{' '}
+              <b className="tabular">{report.tests.filter((t) => t.recent && t.status === 'pass').length}</b> đạt
+            </p>
+            <ul aria-label="File test vừa sửa" className="flex flex-wrap gap-1.5">
+              {report.recent.files.map((f) => (
+                <li key={f}>
+                  <code className="rounded bg-secondary px-1.5 py-0.5 text-xs">{f}</code>
+                </li>
+              ))}
+            </ul>
+            <TestList tests={report.tests.filter((t) => t.recent)} label="Danh sách test vừa thay đổi" />
+          </div>
+        </Section>
+      )}
+
       <Section title="15 hạng mục kiểm thử" aside="Bấm một hàng để xem chi tiết từng test">
         <ScrollArea label="Bảng 15 hạng mục" className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
@@ -280,7 +331,7 @@ export default function QualityPage() {
                 const tests = testsOf(c.testIds);
                 return (
                   <Fragment key={c.id}>
-                    <tr className="border-b border-border align-top hover:bg-background">
+                    <tr className={`border-b border-border align-top hover:bg-background ${c.recent ? 'bg-secondary/60' : ''}`}>
                       <td className="py-2 pr-2 text-muted">{c.id}</td>
                       <td className="py-2 pr-2">
                         <button
@@ -292,6 +343,12 @@ export default function QualityPage() {
                         >
                           <span aria-hidden>{expanded ? '▾' : '▸'}</span> {c.name}
                         </button>
+                        {!!c.recent && (
+                          <span className="ml-2 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+                            <span aria-hidden>★</span>
+                            {c.recent} vừa thay đổi
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 pr-2">
                         <StatusBadge status={c.status} />
