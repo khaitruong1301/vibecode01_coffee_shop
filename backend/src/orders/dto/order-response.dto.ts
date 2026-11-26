@@ -42,7 +42,7 @@ export class TransferInfoDto {
   amount: number;
   /**
    * Nội dung chuyển khoản bắt buộc — server dò mã này trong giao dịch SePay gửi về
-   * @example "CP000001"
+   * @example "CF000001"
    */
   content: string;
   /** Ảnh mã VietQR (qr.sepay.vn) đã điền sẵn số tiền + nội dung */

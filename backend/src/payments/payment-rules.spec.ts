@@ -2,39 +2,40 @@ import { findOrderId, parseSepayDate, qrImageUrl, reconcile, transferContent, ty
 
 describe('transferContent', () => {
   it('đệm 6 chữ số, không dấu gạch', () => {
-    expect(transferContent(123)).toBe('CP000123');
-    expect(transferContent(1234567)).toBe('CP1234567');
+    expect(transferContent(123)).toBe('CF000123');
+    expect(transferContent(1234567)).toBe('CF1234567');
   });
 });
 
 describe('findOrderId — mã đơn trong nội dung chuyển khoản', () => {
   it.each([
-    ['CP000123', 123],
-    ['cp000123', 123],
+    ['CF000123', 123],
+    ['cf-000123', 123],
+    ['cp000123', 123], // tiền tố cũ CP — đơn tạo trước khi đổi sang CF
     ['CP-000123', 123],
-    ['CP 000123', 123],
-    ['MBVCB.3278907687.CP000045.CT tu 0123 NGUYEN VAN A', 45],
-    ['NGUYEN VAN A chuyen tien CP000007 FT25330', 7],
-    ['CP1234567', 1234567],
-    ['CP2147483647', 2147483647],
+    ['CF 000123', 123],
+    ['MBVCB.3278907687.CF000045.CT tu 0123 NGUYEN VAN A', 45],
+    ['NGUYEN VAN A chuyen tien CF000007 FT25330', 7],
+    ['CF1234567', 1234567],
+    ['CF2147483647', 2147483647],
   ])('"%s" → %d', (text, id) => {
     expect(findOrderId(text)).toBe(id);
   });
 
   it.each([
     ['chuyen tien mua cafe'],
-    ['CP12345'], // thiếu chữ số
-    ['XCP000123'], // dính chữ phía trước
-    ['CP000000'], // id 0
-    ['CP3278907687'], // vượt int4 — không thể là đơn thật
+    ['CF12345'], // thiếu chữ số
+    ['XCF000123'], // dính chữ phía trước
+    ['CF000000'], // id 0
+    ['CF3278907687'], // vượt int4 — không thể là đơn thật
     [''],
   ])('"%s" → null', (text) => {
     expect(findOrderId(text)).toBeNull();
   });
 
   it('ưu tiên field đầu tiên có mã (code SePay rồi tới content)', () => {
-    expect(findOrderId(null, 'abc CP000009')).toBe(9);
-    expect(findOrderId('CP000001', 'CP000009')).toBe(1);
+    expect(findOrderId(null, 'abc CF000009')).toBe(9);
+    expect(findOrderId('CF000001', 'CF000009')).toBe(1);
     expect(findOrderId(undefined, null)).toBeNull();
   });
 });
@@ -77,13 +78,13 @@ describe('reconcile — đối soát giao dịch với đơn (BR06)', () => {
 
 describe('qrImageUrl', () => {
   it('dựng link QR SePay có số tiền + nội dung', () => {
-    const url = new URL(qrImageUrl('MBBank', '0123456789', 45000, 'CP000001'));
+    const url = new URL(qrImageUrl('MBBank', '0123456789', 45000, 'CF000001'));
     expect(url.origin + url.pathname).toBe('https://qr.sepay.vn/img');
     expect(Object.fromEntries(url.searchParams)).toEqual({
       acc: '0123456789',
       bank: 'MBBank',
       amount: '45000',
-      des: 'CP000001',
+      des: 'CF000001',
       template: 'compact',
     });
   });

@@ -32,8 +32,8 @@ const unpaid: Order = {
     accountNo: '0123456789',
     accountName: 'QUAN CA PHE',
     amount: 45000,
-    content: 'CP000007',
-    qrUrl: 'https://qr.sepay.vn/img?acc=0123456789&bank=MBBank&amount=45000&des=CP000007&template=compact',
+    content: 'CF000007',
+    qrUrl: 'https://qr.sepay.vn/img?acc=0123456789&bank=MBBank&amount=45000&des=CF000007&template=compact',
   },
   createdAt: '2026-11-26T07:00:00Z',
   cashier: { id: 1, fullName: 'Thu Ngân' },
@@ -53,7 +53,7 @@ const SETTINGS: PaymentSettings = {
 const TXS: BankTransaction[] = [
   {
     id: 2, sepayId: 92705, gateway: 'MBBank', accountNumber: '0123456789', transferType: 'in', amount: 45000,
-    content: 'NGUYEN VAN A CP000007', referenceCode: null, transactionDate: '2026-11-26T07:01:00Z', createdAt: '2026-11-26T07:01:02Z',
+    content: 'NGUYEN VAN A CF000007', referenceCode: null, transactionDate: '2026-11-26T07:01:00Z', createdAt: '2026-11-26T07:01:02Z',
     status: 'matched', statusLabel: 'Đã khớp đơn', orderCode: 'CP-000007',
   },
   {
@@ -94,7 +94,7 @@ describe('Hóa đơn chuyển khoản (UC07)', () => {
     const panel = await screen.findByRole('region', { name: 'Thanh toán chuyển khoản' });
     expect(within(panel).getByRole('img', { name: /Mã QR chuyển khoản 45\.000đ/ })).toHaveAttribute('src', unpaid.transfer?.qrUrl);
     expect(within(panel).getByText('0123456789')).toBeInTheDocument();
-    expect(within(panel).getByText('CP000007')).toBeInTheDocument();
+    expect(within(panel).getByText('CF000007')).toBeInTheDocument();
     expect(screen.getByText('Chờ chuyển khoản')).toBeInTheDocument();
 
     current = paid;
@@ -180,7 +180,7 @@ describe('Hóa đơn chuyển khoản (UC07)', () => {
     routes['/api/orders/CP-000007'] = () => ({ status: 200, body: unpaid });
     render(<ReceiptPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Chép' }));
-    expect(writeText).toHaveBeenCalledWith('CP000007');
+    expect(writeText).toHaveBeenCalledWith('CF000007');
     expect(screen.getByRole('button', { name: 'Đã chép' })).toBeInTheDocument();
   });
 

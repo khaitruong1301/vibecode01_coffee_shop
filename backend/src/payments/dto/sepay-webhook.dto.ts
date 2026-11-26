@@ -44,7 +44,7 @@ export class SepayWebhookDto {
 
   /**
    * Mã thanh toán SePay tự nhận diện (nếu đã cấu hình tiền tố) — có thể null
-   * @example "CP000001"
+   * @example "CF000001"
    */
   @IsOptional()
   @Transform(clip(100))
@@ -52,8 +52,8 @@ export class SepayWebhookDto {
   code?: string | null;
 
   /**
-   * Nội dung chuyển khoản — server tìm mã đơn CP000123 trong đây (quá 500 ký tự thì cắt bớt khi lưu)
-   * @example "NGUYEN VAN A chuyen tien CP000001"
+   * Nội dung chuyển khoản — server tìm mã đơn CF000123 trong đây (quá 500 ký tự thì cắt bớt khi lưu)
+   * @example "NGUYEN VAN A chuyen tien CF000001"
    */
   @IsOptional()
   @Transform(clip(500))

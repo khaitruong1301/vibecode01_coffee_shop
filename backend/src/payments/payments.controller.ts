@@ -25,7 +25,7 @@ export class PaymentsController {
     description: [
       'Cấu hình trên SePay: URL `<địa chỉ web>/api/payments/sepay/webhook`, loại giao dịch **Tiền vào**, định dạng **JSON**, bảo mật **API Key** = `SEPAY_WEBHOOK_KEY`.',
       'Header bắt buộc: `Authorization: Apikey <SEPAY_WEBHOOK_KEY>`.',
-      'Server tìm mã `CP000123` trong `code` / `content`; đơn chuyển khoản nhận đủ tiền (cộng dồn) → đã thanh toán (BR06).',
+      'Server tìm mã `CF000123` trong `code` / `content`; đơn chuyển khoản nhận đủ tiền (cộng dồn) → đã thanh toán (BR06).',
       'Cùng `id` gửi lại nhiều lần chỉ xử lý một lần. Luôn trả `{ "success": true }` khi đã ghi nhận.',
     ].join('\n\n'),
   })

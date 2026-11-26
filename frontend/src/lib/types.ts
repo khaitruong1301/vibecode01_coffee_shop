@@ -55,7 +55,7 @@ export interface TransferInfo {
   accountName: string | null;
   /** Số tiền còn phải chuyển */
   amount: number;
-  /** Nội dung chuyển khoản bắt buộc, vd. CP000123 */
+  /** Nội dung chuyển khoản bắt buộc, vd. CF000123 */
   content: string;
   qrUrl: string;
 }

@@ -7,19 +7,26 @@ export const MAX_ORDER_ID = 2_147_483_647;
 /** Giao dịch tính vào số tiền khách đã chuyển cho đơn. */
 export const RECEIVED_STATUSES: BankTxStatus[] = ['matched', 'partial', 'already_paid'];
 
-/** Nội dung chuyển khoản in trong mã QR: CP000123 (không dấu gạch — nhiều ngân hàng bỏ ký tự đặc biệt). */
+/**
+ * Tiền tố mã thanh toán — phải trùng "Cấu trúc mã thanh toán" trên SePay
+ * (tiền tố `CF`, hậu tố 6–10 ký tự, kiểu "Số nguyên") để SePay nhận diện được field `code`.
+ */
+export const PAYMENT_CODE_PREFIX = 'CF';
+
+/** Nội dung chuyển khoản in trong mã QR: CF000123 (không dấu gạch — nhiều ngân hàng bỏ ký tự đặc biệt). */
 export function transferContent(orderId: number): string {
-  return `CP${String(orderId).padStart(6, '0')}`;
+  return `${PAYMENT_CODE_PREFIX}${String(orderId).padStart(6, '0')}`;
 }
 
 /**
  * Tìm mã đơn trong nội dung chuyển khoản. Ngân hàng có thể chèn thêm chữ trước/sau, đổi hoa thường,
- * giữ hoặc bỏ dấu gạch: "MBVCB.123.CP000123.CT tu ..." · "cp-000123" · "CP 000123".
+ * giữ hoặc bỏ dấu gạch: "MBVCB.123.CF000123.CT tu ..." · "cf-000123" · "CF 000123".
+ * Vẫn nhận tiền tố cũ `CP` — đơn tạo trước khi đổi sang `CF` (QR in `CP000123`) vẫn khớp được.
  */
 export function findOrderId(...texts: (string | null | undefined)[]): number | null {
   for (const text of texts) {
     if (!text) continue;
-    const m = /(?<![A-Z0-9])CP[-\s]?(\d{6,10})(?!\d)/i.exec(text);
+    const m = /(?<![A-Z0-9])C[FP][-\s]?(\d{6,10})(?!\d)/i.exec(text);
     if (m) {
       const id = Number(m[1]);
       if (id > 0 && id <= MAX_ORDER_ID) return id;
