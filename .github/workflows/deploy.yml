@@ -1,6 +1,7 @@
 # CD CoffeePOS — deploy THỦ CÔNG: Actions → Deploy → Run workflow (hoặc `gh workflow run deploy.yml -f ref=main`).
 # Push lên main chỉ chạy CI, không tự deploy. Mặc định chỉ cho deploy commit đã có CI xanh.
-# Server tự build image và chạy docker-compose.yml với .env production (xem scripts/deploy.sh):
+# Image backend + frontend được BUILD TRÊN GITHUB ACTIONS rồi đẩy lên GHCR (ghcr.io/<owner>/<repo>-backend|frontend:<sha>);
+# server chỉ pull image và chạy docker-compose.yml với .env production (xem scripts/deploy.sh) — không build trên server.
 # DB và API chỉ nghe trên 127.0.0.1, chỉ web (FRONTEND_PORT) mở ra Internet.
 #
 # Secrets (Settings → Secrets and variables → Actions):
@@ -26,41 +27,96 @@ on:
 
 permissions:
   contents: read
-  actions: read   # đọc kết quả CI của commit
+  actions: read    # đọc kết quả CI của commit
+  packages: write  # đẩy image lên GHCR; server dùng token của run để pull
 
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy lên server
+  build:
+    name: Build image (GitHub Actions → GHCR)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment:
-      name: production
-      url: ${{ vars.DEPLOY_URL }}
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      backend_image: ${{ steps.meta.outputs.backend_image }}
+      frontend_image: ${{ steps.meta.outputs.frontend_image }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
 
       - name: Xác định commit + kiểm tra CI
+        id: meta
         env:
           GH_TOKEN: ${{ github.token }}
           SKIP: ${{ inputs.skip_ci_check }}
         run: |
           SHA=$(git rev-parse HEAD)
-          echo "SHA=$SHA" >> "$GITHUB_ENV"
           echo "Deploy ${{ inputs.ref }} → $(git log -1 --format='%h %s')"
           if [ "$SKIP" = "true" ]; then
-            echo "::warning::Bỏ qua kiểm tra CI theo yêu cầu"; exit 0
+            echo "::warning::Bỏ qua kiểm tra CI theo yêu cầu"
+          else
+            OK=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$SHA" --status success --json databaseId --jq length)
+            if [ "$OK" -eq 0 ]; then
+              echo "::error::Commit ${SHA::7} chưa có lần chạy CI thành công — chờ CI xanh hoặc chọn skip_ci_check"; exit 1
+            fi
+            echo "CI đã xanh cho ${SHA::7}"
           fi
-          OK=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$SHA" --status success --json databaseId --jq length)
-          if [ "$OK" -eq 0 ]; then
-            echo "::error::Commit ${SHA::7} chưa có lần chạy CI thành công — chờ CI xanh hoặc chọn skip_ci_check"; exit 1
-          fi
-          echo "CI đã xanh cho ${SHA::7}"
+          # Tên image trên GHCR phải viết thường
+          BASE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "sha=$SHA"
+            echo "backend_image=$BASE-backend:$SHA"
+            echo "frontend_image=$BASE-frontend:$SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build + push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.backend_image }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build + push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.frontend_image }}
+          # Giống build args trong docker-compose.yml
+          build-args: |
+            BACKEND_URL=http://backend:4100
+            ENABLE_HSTS=${{ vars.COOKIE_SECURE || 'false' }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  deploy:
+    name: Deploy lên server
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_URL }}
+    env:
+      SHA: ${{ needs.build.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.sha }}
 
       - name: Cấu hình SSH
         env:
@@ -82,7 +138,7 @@ jobs:
             ServerAliveInterval 30
           EOF
 
-      - name: Ghi .env trên server
+      - name: Ghi .env + token pull image trên server
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
@@ -92,6 +148,9 @@ jobs:
           FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '3100' }}
           SEED: ${{ vars.SEED || 'true' }}
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          BACKEND_IMAGE: ${{ needs.build.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build.outputs.frontend_image }}
+          GHCR_TOKEN: ${{ github.token }}
         run: |
           test -n "$JWT_SECRET" && test -n "$DB_PASSWORD" || { echo "Thiếu secret JWT_SECRET / DB_PASSWORD"; exit 1; }
           [ "${#JWT_SECRET}" -ge 32 ] || { echo "JWT_SECRET phải dài tối thiểu 32 ký tự"; exit 1; }
@@ -111,13 +170,18 @@ jobs:
             echo "DB_BIND=127.0.0.1"
             echo "BACKEND_BIND=127.0.0.1"
             echo "CORS_ORIGIN=\"${DEPLOY_URL:-http://localhost:$FRONTEND_PORT}\""
+            echo "BACKEND_IMAGE=$BACKEND_IMAGE"
+            echo "FRONTEND_IMAGE=$FRONTEND_IMAGE"
           } | ssh server 'umask 077 && mkdir -p /opt/coffeepos && cat > /opt/coffeepos/.env'
+          # Token của run (hết hạn khi job xong) — deploy.sh dùng để pull image GHCR rồi xoá ngay
+          printf '%s' "$GHCR_TOKEN" | ssh server 'umask 077 && cat > /opt/coffeepos/.ghcr-token'
 
-      - name: Deploy (git fetch → docker compose up --build → health check)
-        run: ssh server "bash -s -- https://github.com/${{ github.repository }}.git $SHA" < scripts/deploy.sh
+      - name: Deploy (git fetch → docker compose pull → up → health check)
+        run: ssh server "bash -s -- https://github.com/${{ github.repository }}.git $SHA ${{ github.actor }}" < scripts/deploy.sh
 
       - name: Tóm tắt
         if: always()
         run: |
           echo "### Deploy \`${SHA::7}\` (${{ inputs.ref }}) — ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: \`${{ needs.build.outputs.backend_image }}\`, \`${{ needs.build.outputs.frontend_image }}\`" >> "$GITHUB_STEP_SUMMARY"
           [ -n "${{ vars.DEPLOY_URL }}" ] && echo "Web: ${{ vars.DEPLOY_URL }}" >> "$GITHUB_STEP_SUMMARY" || true

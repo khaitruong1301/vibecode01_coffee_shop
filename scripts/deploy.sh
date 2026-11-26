@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Deploy CoffeePOS lên server — chạy TRÊN server (workflow .github/workflows/deploy.yml gửi qua SSH):
-#   ssh root@host "bash -s -- <repo_url> <commit_sha>" < scripts/deploy.sh
-# Yêu cầu: $APP_DIR/.env đã có (workflow ghi trước từ GitHub Secrets).
-# Idempotent: lần đầu cài Docker + git, tạo swap nếu RAM < 2GB, clone repo; các lần sau chỉ cập nhật code + build lại.
+#   ssh root@host "bash -s -- <repo_url> <commit_sha> [ghcr_user]" < scripts/deploy.sh
+# Yêu cầu: $APP_DIR/.env đã có (workflow ghi trước từ GitHub Secrets), kèm BACKEND_IMAGE / FRONTEND_IMAGE
+# (image build sẵn trên GitHub Actions) và $APP_DIR/.ghcr-token để pull từ GHCR.
+# Thiếu BACKEND_IMAGE thì build tại server như cũ (chạy tay).
+# Idempotent: lần đầu cài Docker + git, tạo swap nếu RAM < 2GB, clone repo; các lần sau chỉ cập nhật code + pull image.
+# Repo trên server chỉ dùng cho docker-compose.yml và database/init — không build code.
 set -euo pipefail
 
 REPO_URL="${1:?Thiếu repo URL}"
 SHA="${2:?Thiếu commit SHA}"
+GHCR_USER="${3:-}"
 APP_DIR="${APP_DIR:-/opt/coffeepos}"
 COMPOSE=(docker compose)
 
@@ -25,7 +29,7 @@ fi
 docker compose version
 end
 
-# Build Next.js + NestJS trên máy 1GB RAM dễ bị OOM → thêm 2GB swap (chỉ khi chưa có swap).
+# Máy 1GB RAM chạy 3 container (và khi phải build tại chỗ) dễ bị OOM → thêm 2GB swap (chỉ khi chưa có swap).
 if [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -lt 2000000 ] && [ "$(awk 'NR>1' /proc/swaps | wc -l)" -eq 0 ]; then
   log "Tạo swap 2GB"
   fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
@@ -54,9 +58,24 @@ if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
   ufw allow "${FRONTEND_PORT:-3100}/tcp" >/dev/null
 fi
 
-log "Build + chạy container"
 mkdir -p reports
-"${COMPOSE[@]}" up -d --build --wait --remove-orphans
+if [ -n "${BACKEND_IMAGE:-}" ] && [ -n "${FRONTEND_IMAGE:-}" ]; then
+  log "Pull image build sẵn trên GitHub Actions"
+  if [ -f .ghcr-token ]; then
+    docker login ghcr.io -u "${GHCR_USER:-github-actions}" --password-stdin < .ghcr-token
+    rm -f .ghcr-token
+  fi
+  pull_ok=0
+  "${COMPOSE[@]}" pull backend frontend || pull_ok=$?
+  docker logout ghcr.io >/dev/null 2>&1 || true
+  [ "$pull_ok" -eq 0 ] || { echo "Pull image thất bại" >&2; exit 1; }
+  end
+  log "Chạy container"
+  "${COMPOSE[@]}" up -d --no-build --wait --remove-orphans
+else
+  log "Build + chạy container (không có image build sẵn)"
+  "${COMPOSE[@]}" up -d --build --wait --remove-orphans
+fi
 "${COMPOSE[@]}" ps
 end
 
@@ -71,4 +90,4 @@ for i in $(seq 1 30); do
 done
 end
 
-docker image prune -f >/dev/null
+docker image prune -af >/dev/null   # xoá image cũ (kể cả bản <sha> trước) — chỉ giữ image đang chạy

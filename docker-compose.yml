@@ -26,6 +26,8 @@ services:
       retries: 20
 
   backend:
+    # Production: deploy.yml đặt BACKEND_IMAGE = image build trên GitHub Actions (GHCR) → server chỉ pull
+    image: ${BACKEND_IMAGE:-coffeepos-backend}
     build: ./backend
     restart: unless-stopped
     depends_on:
@@ -57,9 +59,11 @@ services:
       retries: 10
 
   frontend:
+    image: ${FRONTEND_IMAGE:-coffeepos-frontend}
     build:
       context: ./frontend
       args:
+        # Giữ khớp với build-args trong .github/workflows/deploy.yml
         BACKEND_URL: http://backend:4100
         # Chỉ bật khi web chạy HTTPS — trình duyệt sẽ nhớ và từ chối HTTP
         ENABLE_HSTS: ${COOKIE_SECURE:-false}

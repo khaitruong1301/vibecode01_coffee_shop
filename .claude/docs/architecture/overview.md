@@ -9,7 +9,7 @@
 | ORM / DB | Prisma 7.10 (`prisma-client` generator, `@prisma/adapter-pg`) → PostgreSQL 17 |
 | Test | Jest + ts-jest (unit), Jest + supertest (e2e trên `coffeepos_test`) |
 | Đóng gói | Docker (multi-stage, `node:22-alpine`), Docker Compose |
-| CI/CD | GitHub Actions: `ci.yml` (kiểm thử, tự chạy), `deploy.yml` (deploy thủ công: SSH lên server, build bằng Docker Compose) |
+| CI/CD | GitHub Actions: `ci.yml` (kiểm thử, tự chạy), `deploy.yml` (deploy thủ công: build image trên GitHub Actions → GHCR, SSH lên server pull + chạy Docker Compose) |
 
 > Dùng NestJS 11 thay vì 12: bản 12 chuyển sang ESM thuần, chưa phù hợp với Prisma client CommonJS của dự án.
 
@@ -105,6 +105,7 @@ frontend/
 | `BACKEND_URL` | frontend (build) | mặc định `http://localhost:4100`; Docker: `http://backend:4100` |
 | `DB_PASSWORD`, `DB_PORT`, `BACKEND_PORT`, `FRONTEND_PORT` | compose | xem `.env.example` |
 | `DB_BIND`, `BACKEND_BIND` | compose | địa chỉ mở cổng DB / API; mặc định `0.0.0.0`, production `127.0.0.1` |
+| `BACKEND_IMAGE`, `FRONTEND_IMAGE` | compose | tên image; dev bỏ trống (build tại chỗ, `coffeepos-backend` / `coffeepos-frontend`); production do `deploy.yml` ghi = image GHCR theo commit |
 
 ## 6. Script
 
@@ -129,16 +130,17 @@ frontend/
 | `ref` | `main` | branch, tag hoặc commit SHA cần deploy — rollback = nhập commit cũ |
 | `skip_ci_check` | `false` | mặc định workflow dừng nếu commit chưa có lần chạy CI thành công; chỉ bật khi khẩn cấp |
 
-Các bước:
+Các bước — **build trên GitHub Actions, server không build**:
 
-1. Checkout `ref`, kiểm tra commit đã có CI xanh.
-2. SSH vào server bằng deploy key (kiểm tra host key qua `SSH_KNOWN_HOSTS`).
-3. Kiểm tra secret (`JWT_SECRET` ≥ 32 ký tự, có `SEED_PASSWORD` khi `SEED=true`), ghi `/opt/coffeepos/.env` từ GitHub Secrets/Variables (quyền 600, kèm `APP_ENV=production`, DB/API bind `127.0.0.1`).
-4. Gửi `scripts/deploy.sh` chạy trên server: lần đầu cài git + Docker, tạo swap 2GB nếu RAM < 2GB; lấy đúng commit đã qua CI (`git fetch --depth 1` + checkout); `docker compose up -d --build --wait`; gọi `/api/health` qua cổng web; dọn image cũ.
+1. Job `build`: checkout `ref`, kiểm tra commit đã có CI xanh; build image backend + frontend bằng Buildx (cache GitHub Actions) và đẩy lên GHCR: `ghcr.io/<owner>/<repo>-backend:<sha>`, `ghcr.io/<owner>/<repo>-frontend:<sha>` (frontend build arg `BACKEND_URL=http://backend:4100`, `ENABLE_HSTS` = variable `COOKIE_SECURE`).
+2. Job `deploy`: SSH vào server bằng deploy key (kiểm tra host key qua `SSH_KNOWN_HOSTS`).
+3. Kiểm tra secret (`JWT_SECRET` ≥ 32 ký tự, có `SEED_PASSWORD` khi `SEED=true`), ghi `/opt/coffeepos/.env` từ GitHub Secrets/Variables (quyền 600, kèm `APP_ENV=production`, DB/API bind `127.0.0.1`, `BACKEND_IMAGE` / `FRONTEND_IMAGE`) và token của run vào `/opt/coffeepos/.ghcr-token`.
+4. Gửi `scripts/deploy.sh` chạy trên server: lần đầu cài git + Docker, tạo swap 2GB nếu RAM < 2GB; lấy đúng commit (`git fetch --depth 1` + checkout — chỉ để có `docker-compose.yml`, `database/init`); `docker login ghcr.io` bằng token rồi xoá token; `docker compose pull` + `up -d --no-build --wait`; `docker logout`; gọi `/api/health` qua cổng web; dọn image không dùng. Nếu `.env` không có `BACKEND_IMAGE` (chạy tay) thì script build tại server như cũ.
 
 | Server | Giá trị |
 |---|---|
 | Thư mục | `/opt/coffeepos` (code + `.env`), dữ liệu DB ở volume `coffeepos_db-data` |
+| Image | GHCR (Packages của repo), tag = commit SHA; workflow dùng `GITHUB_TOKEN` (`packages: write`) — không cần thêm secret |
 | Cổng mở ra Internet | chỉ web `FRONTEND_PORT` (mặc định 3100); DB và API nghe trên `127.0.0.1` |
 | Swagger | tắt trên production; bật bằng variable `SWAGGER_ENABLED=true` → `<DEPLOY_URL>/api/docs` (đi qua Next rewrites) |
 
@@ -158,4 +160,4 @@ Các bước:
 | `COOKIE_SECURE` | `false` — đặt `true` khi web chạy HTTPS (cookie Secure + HSTS) |
 | `SWAGGER_ENABLED` | `false` (production tắt `/api/docs`) |
 
-Kiểm tra trên server: `cd /opt/coffeepos && docker compose ps` · `docker compose logs -f backend`. Rollback: chạy workflow Deploy với `ref` = commit cũ, hoặc trên server `git fetch --depth 1 origin <sha> && git checkout -f FETCH_HEAD && docker compose up -d --build`.
+Kiểm tra trên server: `cd /opt/coffeepos && docker compose ps` · `docker compose logs -f backend`. Rollback: chạy workflow Deploy với `ref` = commit cũ (image của commit đó được build/đẩy lại nếu cần — cache Buildx làm nhanh).
