@@ -8,3 +8,8 @@ process.env.DATABASE_URL =
 process.env.NODE_ENV = 'test';
 // Báo cáo kiểm thử giả cho quality.e2e-spec.ts — không đọc reports/ thật của repo.
 process.env.TEST_REPORT_PATH = join(tmpdir(), `coffeepos-test-report-${process.pid}.json`);
+// Thanh toán chuyển khoản SePay (UC07) — key + tài khoản giả chỉ dùng cho e2e.
+process.env.SEPAY_WEBHOOK_KEY = 'e2e-sepay-webhook-key-0123456789abcdef';
+process.env.SEPAY_BANK = 'MBBank';
+process.env.SEPAY_ACCOUNT_NO = '0123456789';
+process.env.SEPAY_ACCOUNT_NAME = 'QUAN CA PHE E2E';

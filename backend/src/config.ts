@@ -15,12 +15,23 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv): string[] {
   if (!secret || secret === DEV_JWT_SECRET) errors.push('JWT_SECRET chưa đặt hoặc đang dùng giá trị mặc định cho dev');
   else if (secret.length < 32) errors.push('JWT_SECRET phải dài tối thiểu 32 ký tự');
   if (env.SEED === 'true' && !env.SEED_PASSWORD) errors.push('SEED=true trên production cần SEED_PASSWORD (không dùng mật khẩu demo)');
+  // Webhook SePay là tuỳ chọn; đã bật thì API key phải đủ dài để không đoán được.
+  if (env.SEPAY_WEBHOOK_KEY && env.SEPAY_WEBHOOK_KEY.length < 24) errors.push('SEPAY_WEBHOOK_KEY phải dài tối thiểu 24 ký tự');
   return errors;
 }
 
 const prodErrors = productionConfigErrors(process.env);
 if (prodErrors.length) {
   throw new Error(`Cấu hình production không an toàn:\n- ${prodErrors.join('\n- ')}`);
+}
+
+/**
+ * Bật thanh toán chuyển khoản (UC07) khi có đủ tài khoản nhận tiền VÀ webhook key —
+ * thiếu key thì SePay không báo được tiền về, đơn sẽ kẹt "Chờ chuyển khoản".
+ */
+export function transferEnabled(): boolean {
+  const { bank, accountNo, webhookKey } = config.sepay;
+  return !!(bank && accountNo && webhookKey);
 }
 
 const appEnv = process.env.APP_ENV ?? 'development';
@@ -44,6 +55,18 @@ export const config = {
   swaggerEnabled: process.env.SWAGGER_ENABLED ? process.env.SWAGGER_ENABLED === 'true' : !isProduction,
   /** File báo cáo kiểm thử do `npm run test:report` (thư mục gốc) sinh ra; Docker mount ./reports vào /app/reports. */
   testReportPath: process.env.TEST_REPORT_PATH ?? resolve(process.cwd(), '../reports/test-report.json'),
+  /**
+   * Thanh toán chuyển khoản qua SePay (UC07). Thiếu `webhookKey` → webhook từ chối mọi request;
+   * thiếu thông tin tài khoản → không tạo được đơn chuyển khoản.
+   */
+  sepay: {
+    /** API key SePay gửi kèm header `Authorization: Apikey <key>`. */
+    webhookKey: process.env.SEPAY_WEBHOOK_KEY ?? '',
+    /** Mã ngân hàng theo SePay / VietQR, vd. MBBank, Vietcombank, ACB. */
+    bank: process.env.SEPAY_BANK ?? '',
+    accountNo: process.env.SEPAY_ACCOUNT_NO ?? '',
+    accountName: process.env.SEPAY_ACCOUNT_NAME ?? '',
+  },
   /** Chống dò mật khẩu: số lần đăng nhập SAI tối đa trong cửa sổ thời gian. */
   login: {
     maxFailsPerUser: num(process.env.LOGIN_MAX_FAILS_PER_USER, 5),

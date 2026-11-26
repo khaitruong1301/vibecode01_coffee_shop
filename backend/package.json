@@ -81,6 +81,7 @@
     "collectCoverageFrom": [
       "pricing/**/*.ts",
       "orders/order-*.ts",
+      "payments/payment-rules.ts",
       "common/**/*.ts",
       "auth/login-limiter.ts",
       "!**/*.spec.ts",

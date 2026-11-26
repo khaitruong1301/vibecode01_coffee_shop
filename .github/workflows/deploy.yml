@@ -8,9 +8,11 @@
 #   SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, SSH_KNOWN_HOSTS  — kết nối server
 #   JWT_SECRET (≥ 32 ký tự), DB_PASSWORD                   — ghi vào .env trên server
 #   SEED_PASSWORD   — mật khẩu cho tài khoản seed; BẮT BUỘC khi SEED=true (không dùng mật khẩu demo công khai)
+#   SEPAY_WEBHOOK_KEY — (tuỳ chọn) API key webhook SePay, ≥ 24 ký tự; bỏ trống = webhook tắt
 #     (DB_PASSWORD chỉ có hiệu lực khi volume DB tạo lần đầu — đổi sau đó phải đổi cả trong Postgres)
 # Variables (tuỳ chọn): FRONTEND_PORT (mặc định 3100), SEED (mặc định true), DEPLOY_URL (link hiển thị),
-#   COOKIE_SECURE (true khi web chạy HTTPS → cookie Secure + HSTS), SWAGGER_ENABLED (mặc định tắt trên production)
+#   COOKIE_SECURE (true khi web chạy HTTPS → cookie Secure + HSTS), SWAGGER_ENABLED (mặc định tắt trên production),
+#   SEPAY_BANK, SEPAY_ACCOUNT_NO, SEPAY_ACCOUNT_NAME (tài khoản nhận chuyển khoản — thiếu thì không bật chuyển khoản)
 name: Deploy
 
 on:
@@ -151,9 +153,16 @@ jobs:
           BACKEND_IMAGE: ${{ needs.build.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.build.outputs.frontend_image }}
           GHCR_TOKEN: ${{ github.token }}
+          SEPAY_WEBHOOK_KEY: ${{ secrets.SEPAY_WEBHOOK_KEY }}
+          SEPAY_BANK: ${{ vars.SEPAY_BANK }}
+          SEPAY_ACCOUNT_NO: ${{ vars.SEPAY_ACCOUNT_NO }}
+          SEPAY_ACCOUNT_NAME: ${{ vars.SEPAY_ACCOUNT_NAME }}
         run: |
           test -n "$JWT_SECRET" && test -n "$DB_PASSWORD" || { echo "Thiếu secret JWT_SECRET / DB_PASSWORD"; exit 1; }
           [ "${#JWT_SECRET}" -ge 32 ] || { echo "JWT_SECRET phải dài tối thiểu 32 ký tự"; exit 1; }
+          if [ -n "$SEPAY_WEBHOOK_KEY" ] && [ "${#SEPAY_WEBHOOK_KEY}" -lt 24 ]; then
+            echo "SEPAY_WEBHOOK_KEY phải dài tối thiểu 24 ký tự"; exit 1
+          fi
           if [ "$SEED" = "true" ] && [ -z "$SEED_PASSWORD" ]; then
             echo "SEED=true cần secret SEED_PASSWORD — không seed tài khoản bằng mật khẩu demo công khai"; exit 1
           fi
@@ -172,6 +181,10 @@ jobs:
             echo "CORS_ORIGIN=\"${DEPLOY_URL:-http://localhost:$FRONTEND_PORT}\""
             echo "BACKEND_IMAGE=$BACKEND_IMAGE"
             echo "FRONTEND_IMAGE=$FRONTEND_IMAGE"
+            echo "SEPAY_WEBHOOK_KEY=\"$SEPAY_WEBHOOK_KEY\""
+            echo "SEPAY_BANK=\"$SEPAY_BANK\""
+            echo "SEPAY_ACCOUNT_NO=\"$SEPAY_ACCOUNT_NO\""
+            echo "SEPAY_ACCOUNT_NAME=\"$SEPAY_ACCOUNT_NAME\""
           } | ssh server 'umask 077 && mkdir -p /opt/coffeepos && cat > /opt/coffeepos/.env'
           # Token của run (hết hạn khi job xong) — deploy.sh dùng để pull image GHCR rồi xoá ngay
           printf '%s' "$GHCR_TOKEN" | ssh server 'umask 077 && cat > /opt/coffeepos/.ghcr-token'

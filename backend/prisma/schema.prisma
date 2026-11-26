@@ -20,7 +20,7 @@ enum Role {
   admin
 }
 
-/// Trạng thái pha chế của đơn. Đơn đã thanh toán ngay khi tạo (bấm Thanh toán = tạo đơn).
+/// Trạng thái pha chế của đơn. Đơn tiền mặt đã thanh toán ngay khi tạo; đơn chuyển khoản chờ SePay báo tiền về (UC07).
 enum OrderStatus {
   pending
   preparing
@@ -33,6 +33,32 @@ enum OrderSource {
   counter
   grabfood
   shopeefood
+}
+
+/// Phương thức thanh toán (UC07). transfer = chuyển khoản qua mã QR, SePay báo tiền về bằng webhook.
+enum PaymentMethod {
+  cash
+  transfer
+}
+
+/// unpaid chỉ có ở đơn chuyển khoản chưa nhận đủ tiền — chưa hiện ở quầy pha (BR06).
+enum PaymentStatus {
+  unpaid
+  paid
+}
+
+/// Kết quả đối soát một giao dịch ngân hàng với đơn hàng (UC07).
+enum BankTxStatus {
+  /// Đủ tiền → đơn chuyển sang đã thanh toán
+  matched
+  /// Gắn được đơn nhưng tổng tiền đã nhận chưa đủ
+  partial
+  /// Đơn đã thanh toán trước đó (chuyển trùng / thừa)
+  already_paid
+  /// Không tìm thấy mã đơn trong nội dung / đơn không tồn tại / tiền vào tài khoản khác tài khoản cấu hình
+  unmatched
+  /// Giao dịch tiền ra — chỉ ghi nhận
+  outgoing
 }
 
 /// S, M giá gốc; L cộng phụ thu (BR05, xem src/orders/pricing.ts).
@@ -56,6 +82,7 @@ model User {
 
   orders          Order[]
   updatedProducts Product[] @relation("ProductUpdatedBy")
+  paidOrders      Order[]   @relation("OrderPaidBy")
 
   @@map("users")
 }
@@ -92,22 +119,31 @@ model Product {
 }
 
 model Order {
-  id          Int         @id @default(autoincrement())
-  cashierId   Int         @map("cashier_id")
-  source      OrderSource @default(counter)
+  id            Int           @id @default(autoincrement())
+  cashierId     Int           @map("cashier_id")
+  source        OrderSource   @default(counter)
   /// Mã đơn của GrabFood / ShopeeFood (bắt buộc khi source khác counter).
-  partnerCode String?     @map("partner_code") @db.VarChar(50)
-  note        String?     @db.VarChar(200)
-  status      OrderStatus @default(pending)
+  partnerCode   String?       @map("partner_code") @db.VarChar(50)
+  note          String?       @db.VarChar(200)
+  status        OrderStatus   @default(pending)
   /// Tổng tiền do server tính từ giá trong DB (BR01).
-  total       Int
-  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  total         Int
+  paymentMethod PaymentMethod @default(cash) @map("payment_method")
+  paymentStatus PaymentStatus @default(paid) @map("payment_status")
+  /// Thời điểm nhận đủ tiền (mặc định lúc tạo — khớp mặc định paid); null khi đơn chuyển khoản chưa thanh toán.
+  paidAt        DateTime?     @default(now()) @map("paid_at") @db.Timestamptz(6)
+  /// Nhân viên xác nhận đã thu tiền (thu ngân lúc tạo đơn tiền mặt / bấm "Khách trả tiền mặt"); null khi SePay báo tiền về.
+  paidById      Int?          @map("paid_by_id")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  cashier User        @relation(fields: [cashierId], references: [id], onDelete: Restrict)
-  items   OrderItem[]
+  cashier          User              @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  paidBy           User?             @relation("OrderPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  items            OrderItem[]
+  bankTransactions BankTransaction[]
 
   @@index([status, createdAt])
+  @@index([paymentStatus, status])
   @@map("orders")
 }
 
@@ -130,4 +166,30 @@ model OrderItem {
 
   @@index([orderId])
   @@map("order_items")
+}
+
+/// Giao dịch ngân hàng SePay gửi qua webhook (UC07). Mỗi giao dịch SePay chỉ lưu một lần (sepay_id unique).
+model BankTransaction {
+  id              Int          @id @default(autoincrement())
+  /// `id` giao dịch phía SePay — chống xử lý trùng khi SePay gửi lại.
+  sepayId         Int          @unique @map("sepay_id")
+  gateway         String       @db.VarChar(100)
+  accountNumber   String       @map("account_number") @db.VarChar(50)
+  transferType    String       @map("transfer_type") @db.VarChar(10)
+  /// Số tiền giao dịch, VNĐ.
+  amount          Int
+  content         String       @db.VarChar(500)
+  referenceCode   String?      @map("reference_code") @db.VarChar(100)
+  /// Thời điểm giao dịch phía ngân hàng (SePay gửi giờ Việt Nam, lưu UTC).
+  transactionDate DateTime     @map("transaction_date") @db.Timestamptz(6)
+  orderId         Int?         @map("order_id")
+  status          BankTxStatus
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("bank_transactions")
 }

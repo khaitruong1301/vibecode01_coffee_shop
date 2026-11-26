@@ -37,7 +37,7 @@ export async function seedDatabase(prisma: PrismaClient, opts: { onlyIfEmpty?: b
 /** Chỉ dùng cho e2e test trên DB test: xóa sạch rồi nạp lại. */
 export async function resetDatabase(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE order_items, orders, products, categories, users RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE bank_transactions, order_items, orders, products, categories, users RESTART IDENTITY CASCADE',
   );
   await seedDatabase(prisma);
 }
