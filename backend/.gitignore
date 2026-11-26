@@ -4,5 +4,7 @@ coverage/
 src/generated/
 .env
 *.tsbuildinfo
-reports/
+/reports/
+# src/reports là code (module báo cáo doanh thu) — gỡ khỏi quy tắc reports/ của .gitignore gốc
+!/src/reports/
 coverage/
