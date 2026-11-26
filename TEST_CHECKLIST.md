@@ -34,7 +34,7 @@ Trang **`/quality`** trong CoffeePOS (menu "Kiểm thử", chỉ tài khoản ad
 | 2 | Unit Testing | ✅ | `backend/src/**/*.spec.ts`, `frontend/src/lib/*.test.ts` | `npm run test:unit` | ✅ BE 47 · FE 28 |
 | 3 | Component Testing | ✅ | `frontend/src/__tests__/*.test.tsx` | `npm run test:unit` | ✅ 21 |
 | 4 | Integration Testing | ⚪ gộp | — (xem ghi chú) | — | Gộp vào #5 và #8 |
-| 5 | API Testing | ✅ | `backend/test/orders.e2e-spec.ts`, `products.e2e-spec.ts`, `swagger.e2e-spec.ts` | `npm run test:api` | ✅ |
+| 5 | API Testing | ✅ | `backend/test/orders.e2e-spec.ts`, `products.e2e-spec.ts`, `payments.e2e-spec.ts`, `reports.e2e-spec.ts`, `swagger.e2e-spec.ts` | `npm run test:api` | ✅ |
 | 6 | End-to-End | ✅ | `e2e/tests/sales.spec.ts` | `npm run test:e2e` | ✅ 9 kịch bản |
 | 7 | Auth & Authorization | ✅ | `backend/test/auth.e2e-spec.ts` + `frontend/src/__tests__/auth.test.tsx` | `npm run test:api` | ✅ ma trận 11 route × 4 trạng thái, khoá đăng nhập, thu hồi token, đổi mật khẩu |
 | 8 | Database Testing | ✅ | `backend/test/database.e2e-spec.ts` | `npm run test:api` | ✅ |
