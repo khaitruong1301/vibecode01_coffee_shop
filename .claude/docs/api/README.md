@@ -10,6 +10,8 @@ Base URL: `http://localhost:4100/api` (trực tiếp) · `http://localhost:3100/
 
 **Vai trò**: `cashier` (Thu ngân) · `barista` (Pha chế) · `admin` (Chủ quán).
 
+**Webhook SePay** (`POST /payments/sepay/webhook`) là route công khai duy nhất ghi dữ liệu: không dùng phiên đăng nhập mà xác thực bằng header `Authorization: Apikey <SEPAY_WEBHOOK_KEY>` (so sánh hằng thời gian). Chưa đặt key → 503.
+
 **Lỗi**: `{ "error": "<tiếng Việt>" }`; lỗi validate thêm `details` theo đường dẫn trường.
 
 ```json
@@ -22,9 +24,10 @@ Base URL: `http://localhost:4100/api` (trực tiếp) · `http://localhost:3100/
 | 401 | chưa đăng nhập, token sai / hết hạn, tài khoản bị khóa |
 | 403 | sai vai trò |
 | 404 | không tìm thấy |
-| 409 | trùng dữ liệu (tên món), chuyển trạng thái sai thứ tự / bị người khác cập nhật trước |
+| 409 | trùng dữ liệu (tên món), chuyển trạng thái sai thứ tự / bị người khác cập nhật trước, pha đơn chưa thanh toán (BR06), thu tiền mặt cho đơn đã thanh toán |
 | 429 | đăng nhập / nhập mật khẩu hiện tại sai quá 5 lần mỗi tài khoản hoặc 20 lần mỗi IP trong 15 phút — kèm header `Retry-After` (giây) |
 | 500 | lỗi hệ thống (không lộ chi tiết) |
+| 503 | webhook SePay khi server chưa đặt `SEPAY_WEBHOOK_KEY` |
 
 **Field lạ bị bỏ qua**: ValidationPipe `whitelist` loại mọi field không khai báo — gửi `price`, `total` lên cũng không có tác dụng.
 
@@ -42,10 +45,14 @@ Base URL: `http://localhost:4100/api` (trực tiếp) · `http://localhost:3100/
 | GET | `/products` | đã đăng nhập | menu đang bán; `?all=true` gồm món ngừng bán (chỉ admin, khác → 403) | UC02, UC06 |
 | POST | `/products` | admin | thêm món | UC06 |
 | PATCH | `/products/:id` | admin | sửa tên / danh mục / giá / size / ẩn-hiện | UC06 |
-| POST | `/orders` | cashier, admin | tạo đơn = bấm Thanh toán | UC02, UC04 |
-| GET | `/orders` | đã đăng nhập | danh sách đơn, `?status=pending,preparing,ready` (mặc định), `?limit=` ≤ 200, cũ nhất trước | UC05 |
+| POST | `/orders` | cashier, admin | tạo đơn = bấm Thanh toán; `paymentMethod: transfer` → đơn chờ chuyển khoản kèm mã QR | UC02, UC04, UC07 |
+| GET | `/orders` | đã đăng nhập | danh sách đơn **đã thanh toán**, `?status=pending,preparing,ready` (mặc định), `?limit=` ≤ 200, thanh toán trước lên trước; `?payment=unpaid` → đơn chờ chuyển khoản, mới nhất trước (chỉ cashier, admin — barista 403) | UC05, UC07 |
 | GET | `/orders/:code` | đã đăng nhập | chi tiết đơn theo mã `CP-000123` (sai định dạng / không có → 404) | UC03 |
-| PATCH | `/orders/:id/status` | barista, admin | chuyển sang bước kế tiếp | UC05 |
+| PATCH | `/orders/:id/status` | barista, admin | chuyển sang bước kế tiếp (đơn chưa thanh toán → 409) | UC05 |
+| POST | `/orders/:id/pay-cash` | cashier, admin | khách trả tiền mặt thay chuyển khoản → đơn đã thanh toán, `paidBy` = người bấm (200); đã thanh toán → 409 | UC07 |
+| POST | `/payments/sepay/webhook` | công khai + API key | SePay báo giao dịch; luôn trả `{ "success": true }` khi đã ghi nhận | UC07 |
+| GET | `/payments/transactions` | cashier, admin | giao dịch SePay đã nhận, mới nhất trước, `?limit=` ≤ 500 (mặc định 100) | UC07 |
+| GET | `/payments/settings` | đã đăng nhập | có bật chuyển khoản không, tài khoản nhận tiền, webhook đã có key chưa (không trả key) | UC07 |
 | GET | `/quality/report` | admin | báo cáo kiểm thử tự động (đọc `reports/test-report.json`); chưa có → 404, file hỏng → 500 | — |
 
 ## 3. Chi tiết
@@ -102,6 +109,7 @@ Mật khẩu mới: 8–72 ký tự (≤ 72 byte), có chữ và số, khác m�
 - `items`: 1–50 dòng; `quantity` số nguyên 1–50; `size` S/M/L, bắt buộc với món có size, bị bỏ qua với món không size.
 - Cùng một món ở nhiều dòng: tổng số lượng tối đa 50 (BR02).
 - `source`: `counter` (mặc định) / `grabfood` / `shopeefood`; khác `counter` thì bắt buộc `partnerCode`.
+- `paymentMethod` (UC07): `cash` (mặc định — đã thu, `paymentStatus: paid`, `paidBy` = thu ngân) / `transfer` (chỉ đơn `counter`, server phải cấu hình đủ `SEPAY_BANK` + `SEPAY_ACCOUNT_NO` + `SEPAY_WEBHOOK_KEY`; đơn `paymentStatus: unpaid`, chưa hiện ở quầy pha — BR06).
 - Server lấy giá từ DB, tính `unitPrice`, `lineTotal`, `total` (BR01, BR05).
 
 **201**:
@@ -109,6 +117,8 @@ Mật khẩu mới: 8–72 ký tự (≤ 72 byte), có chữ và số, khác m�
 {
   "id": 1, "code": "CP-000001", "source": "counter", "partnerCode": null, "note": "Ít đá",
   "status": "pending", "statusLabel": "Chờ pha", "total": 98000,
+  "paymentMethod": "cash", "paymentStatus": "paid", "paymentLabel": "Đã thanh toán", "paidAt": "...", "paidBy": { "id": 2, "fullName": "Thu ngân Lan" },
+  "amountReceived": 0, "transfer": null,
   "createdAt": "...", "updatedAt": "...", "cashier": { "id": 2, "fullName": "Thu ngân Lan" },
   "items": [
     { "id": 1, "productId": 2, "productName": "Cà phê sữa đá", "size": "L", "unitPrice": 35000, "quantity": 2, "lineTotal": 70000, "note": "Ít đường" },
@@ -116,11 +126,50 @@ Mật khẩu mới: 8–72 ký tự (≤ 72 byte), có chữ và số, khác m�
   ]
 }
 ```
-Lỗi: 401 (chưa đăng nhập), 403 (pha chế), 400 (đơn rỗng, số lượng sai, món ngừng bán / không tồn tại, thiếu size, thiếu mã đơn đối tác).
+Đơn chuyển khoản chưa thanh toán có thêm `transfer` (số tiền **còn thiếu**, nội dung bắt buộc, ảnh QR):
+```json
+"paymentMethod": "transfer", "paymentStatus": "unpaid", "paymentLabel": "Chờ chuyển khoản", "paidAt": null, "amountReceived": 0,
+"transfer": { "bank": "MBBank", "accountNo": "0123456789", "accountName": "QUAN CA PHE ABC", "amount": 98000,
+              "content": "CP000001", "qrUrl": "https://qr.sepay.vn/img?acc=0123456789&bank=MBBank&amount=98000&des=CP000001&template=compact" }
+```
+Lỗi: 401 (chưa đăng nhập), 403 (pha chế), 400 (đơn rỗng, số lượng sai, món ngừng bán / không tồn tại, thiếu size, thiếu mã đơn đối tác, chuyển khoản cho đơn đối tác, chưa cấu hình tài khoản nhận chuyển khoản).
 
 ### PATCH `/orders/:id/status` (UC05)
 
 ```json
 { "status": "preparing" }
 ```
-Chỉ đi tới bước kế tiếp: `pending → preparing → ready → done`. Sai thứ tự hoặc đơn vừa được người khác cập nhật → 409. **200** → object đơn.
+Chỉ đi tới bước kế tiếp: `pending → preparing → ready → done`. Sai thứ tự, đơn chưa thanh toán (BR06) hoặc đơn vừa được người khác cập nhật → 409. **200** → object đơn.
+
+### POST `/payments/sepay/webhook` (UC07)
+
+Cấu hình trên SePay (Thêm Webhook): URL `<địa chỉ web>/api/payments/sepay/webhook` · loại giao dịch **Tiền vào** · định dạng **JSON** · bảo mật **API Key** = `SEPAY_WEBHOOK_KEY` · bật tự động gửi lại khi lỗi.
+
+```http
+Authorization: Apikey <SEPAY_WEBHOOK_KEY>
+```
+```json
+{
+  "id": 92704, "gateway": "MBBank", "transactionDate": "2026-11-26 14:02:37", "accountNumber": "0123456789",
+  "code": null, "content": "NGUYEN VAN A chuyen tien CP000001", "transferType": "in", "transferAmount": 98000,
+  "accumulated": 19077000, "subAccount": null, "referenceCode": "MBVCB.3278907687", "description": "..."
+}
+```
+- Chỉ đọc `id`, `gateway`, `transactionDate` (giờ Việt Nam → lưu UTC), `accountNumber`, `code`, `content`, `transferType`, `transferAmount`, `referenceCode`; field khác bị bỏ qua.
+- Chuỗi quá dài (`content` > 500 ký tự…) bị cắt bớt khi lưu, không từ chối. `id` vượt int4 → 400.
+- Mã đơn tìm trong `code` rồi `content`: `CP000001`, chấp nhận `cp-000001`, `CP 000001`, có chữ trước/sau; số vượt int4 không coi là mã đơn.
+- Chỉ tiền vào **đúng `accountNumber` = `SEPAY_ACCOUNT_NO`** mới được gắn đơn.
+- Đối soát (`backend/src/payments/payment-rules.ts`): tiền ra → `outgoing`; không có mã / đơn không tồn tại / sai tài khoản nhận → `unmatched`; đơn đã thanh toán (kể cả đơn tiền mặt) → `already_paid`; cộng dồn mọi lần chuyển, đủ tổng → `matched` (đơn sang đã thanh toán, hiện ở quầy pha), chưa đủ → `partial`. Chuyển thừa vẫn là `matched` — thu ngân tự hoàn phần thừa.
+- Cùng `id` gửi lại (kể cả đồng thời) chỉ ghi một lần. Khoá dòng đơn khi đối soát để hai giao dịch về cùng lúc không cộng sai.
+
+**200** `{ "success": true }` · 401 sai / thiếu key · 400 sai định dạng · 503 chưa đặt key.
+
+### GET `/payments/transactions` (UC07)
+
+**200** `{ "items": [{ "id", "sepayId", "gateway", "accountNumber", "transferType", "amount", "content", "referenceCode", "transactionDate", "createdAt", "status", "statusLabel", "orderCode" }] }` — `statusLabel`: Đã khớp đơn / Chưa đủ tiền / Đơn đã thanh toán trước / Không khớp đơn / Tiền ra.
+
+### GET `/payments/settings` (UC07)
+
+`transferEnabled` = có đủ ngân hàng + số tài khoản + webhook key.
+
+**200** `{ "transferEnabled": true, "bank": "MBBank", "accountNo": "0123456789", "accountName": "QUAN CA PHE ABC", "webhookKeyConfigured": true, "webhookPath": "/api/payments/sepay/webhook" }`

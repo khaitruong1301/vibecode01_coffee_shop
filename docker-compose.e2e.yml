@@ -34,6 +34,11 @@ services:
       PORT: 4100
       SEED: "true"
       TEST_REPORT_PATH: /app/reports/test-report.json
+      # Thanh toán chuyển khoản (UC07) — key + tài khoản giả chỉ dùng cho E2E (tests/payment.spec.ts)
+      SEPAY_WEBHOOK_KEY: e2e-sepay-webhook-key-0123456789abcdef
+      SEPAY_BANK: MBBank
+      SEPAY_ACCOUNT_NO: "0123456789"
+      SEPAY_ACCOUNT_NAME: QUAN CA PHE E2E
     volumes:
       - ./reports:/app/reports:ro   # để E2E/a11y kiểm trang /quality với báo cáo thật (nếu có)
     ports:

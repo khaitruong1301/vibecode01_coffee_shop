@@ -39,6 +39,22 @@ test.describe('Accessibility (WCAG 2.1 AA)', () => {
     await audit(page, '/receipt');
   });
 
+  test('hóa đơn chờ chuyển khoản (khung QR)', async ({ page }) => {
+    await login(page, 'thungan1', /\/checkout$/);
+    await addToCart(page, 'Bánh tiramisu');
+    await page.getByRole('button', { name: /Chuyển khoản/ }).click();
+    await page.getByRole('button', { name: /Thanh toán chuyển khoản/ }).click();
+    await expect(page.getByRole('region', { name: 'Thanh toán chuyển khoản' })).toBeVisible();
+    await audit(page, '/receipt (chuyển khoản)');
+  });
+
+  test('chuyển khoản (chủ quán — có hướng dẫn webhook)', async ({ page }) => {
+    await login(page, 'chuquan', /\/products$/);
+    await page.goto('/payments');
+    await expect(page.getByRole('heading', { name: 'Kết nối SePay' })).toBeVisible();
+    await audit(page, '/payments');
+  });
+
   test('quầy pha', async ({ page }) => {
     await login(page, 'phache1', /\/barista$/);
     await audit(page, '/barista');

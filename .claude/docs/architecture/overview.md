@@ -45,7 +45,8 @@ backend/
     auth/                   login/logout/me, JwtAuthGuard, RolesGuard, @Public @Roles @CurrentUser
     pricing/                luật tính tiền thuần + unit test
     products/               menu, danh mục, thêm/sửa món
-    orders/                 tạo đơn, danh sách, hóa đơn theo mã, trạng thái pha chế
+    orders/                 tạo đơn, danh sách, hóa đơn theo mã, trạng thái pha chế, thu tiền mặt thay chuyển khoản
+    payments/               UC07: webhook SePay (SepayApiKeyGuard), đối soát giao dịch (payment-rules.ts), danh sách giao dịch
     health/                 GET /api/health
     quality/                GET /api/quality/report — đọc reports/test-report.json
     seed/                   dữ liệu mẫu (chỉ nạp khi DB trống)
@@ -64,6 +65,7 @@ frontend/
     (app)/products/         sản phẩm (UC06)
     (app)/quality/          báo cáo kiểm thử (chỉ admin)
     (app)/account/          tài khoản — đổi mật khẩu (mọi vai trò)
+    (app)/payments/         chuyển khoản — giao dịch SePay, hướng dẫn tạo webhook (UC07)
     globals.css · icon.svg · layout.tsx
   src/components/           ui.tsx, AuthProvider.tsx, Navbar.tsx
   src/lib/                  api.ts, format.ts, roles.ts, types.ts
@@ -101,6 +103,8 @@ frontend/
 | `COOKIE_SECURE` | backend, frontend (build `ENABLE_HSTS`) | `true` khi chạy HTTPS: cookie Secure + header HSTS |
 | `LOGIN_MAX_FAILS_PER_USER` / `_PER_IP` / `LOGIN_WINDOW_SEC` | backend | giới hạn đăng nhập sai (mặc định 5 / 20 / 900 giây) |
 | `SWAGGER_ENABLED` | backend | mặc định bật ở dev, **tắt khi `APP_ENV=production`**; đặt `true` / `false` để ép |
+| `SEPAY_WEBHOOK_KEY` | backend, compose | API key webhook SePay (header `Authorization: Apikey …`); bỏ trống = webhook trả 503; production yêu cầu ≥ 24 ký tự |
+| `SEPAY_BANK`, `SEPAY_ACCOUNT_NO`, `SEPAY_ACCOUNT_NAME` | backend, compose | tài khoản nhận chuyển khoản (mã ngân hàng SePay/VietQR, số TK, tên chủ TK) để dựng mã QR; thiếu bank / số TK = tắt chuyển khoản |
 | `TEST_REPORT_PATH` | backend | file báo cáo kiểm thử cho `/api/quality/report`; mặc định `../reports/test-report.json`, Docker: `/app/reports/test-report.json` (mount `./reports` chỉ đọc) |
 | `BACKEND_URL` | frontend (build) | mặc định `http://localhost:4100`; Docker: `http://backend:4100` |
 | `DB_PASSWORD`, `DB_PORT`, `BACKEND_PORT`, `FRONTEND_PORT` | compose | xem `.env.example` |
@@ -151,6 +155,7 @@ Các bước — **build trên GitHub Actions, server không build**:
 | `SSH_KNOWN_HOSTS` | kết quả `ssh-keyscan <host>` |
 | `JWT_SECRET`, `DB_PASSWORD` | ghi vào `.env` server; `JWT_SECRET` ≥ 32 ký tự; `DB_PASSWORD` chỉ áp dụng khi volume DB tạo lần đầu |
 | `SEED_PASSWORD` | mật khẩu tài khoản seed — **bắt buộc khi `SEED=true`** (workflow dừng nếu thiếu); chỉ dùng khi DB trống |
+| `SEPAY_WEBHOOK_KEY` | (tuỳ chọn) API key webhook SePay ≥ 24 ký tự — dán cùng giá trị vào SePay (Bảo mật → API Key) |
 
 | GitHub Variables (tuỳ chọn) | Mặc định |
 |---|---|
@@ -159,5 +164,6 @@ Các bước — **build trên GitHub Actions, server không build**:
 | `DEPLOY_URL` | link hiển thị trên run + `CORS_ORIGIN` |
 | `COOKIE_SECURE` | `false` — đặt `true` khi web chạy HTTPS (cookie Secure + HSTS) |
 | `SWAGGER_ENABLED` | `false` (production tắt `/api/docs`) |
+| `SEPAY_BANK`, `SEPAY_ACCOUNT_NO`, `SEPAY_ACCOUNT_NAME` | trống — tắt chuyển khoản QR (UC07) |
 
 Kiểm tra trên server: `cd /opt/coffeepos && docker compose ps` · `docker compose logs -f backend`. Rollback: chạy workflow Deploy với `ref` = commit cũ (image của commit đó được build/đẩy lại nếu cần — cache Buildx làm nhanh).

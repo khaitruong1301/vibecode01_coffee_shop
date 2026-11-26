@@ -13,7 +13,8 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // qr.sepay.vn: ảnh mã VietQR cho đơn chuyển khoản (UC07)
+  "img-src 'self' data: blob: https://qr.sepay.vn",
   "font-src 'self' data:",
   `connect-src 'self'${isDev ? ' ws: wss:' : ''}`,
   "frame-ancestors 'none'",

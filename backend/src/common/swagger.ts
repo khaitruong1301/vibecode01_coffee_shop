@@ -5,6 +5,7 @@ import { ErrorResponseDto } from './dto/error-response.dto';
 
 export const BEARER = 'bearer';
 export const COOKIE = 'cookie';
+export const SEPAY = 'sepay';
 
 const ERROR_TEXT: Record<number, string> = {
   400: 'Dữ liệu không hợp lệ hoặc vi phạm luật bán hàng',
@@ -40,10 +41,12 @@ export function setupSwagger(app: INestApplication) {
     .setVersion('1.0.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'Token từ POST /api/auth/login' }, BEARER)
     .addCookieAuth(config.cookieName, { type: 'apiKey', in: 'cookie', name: config.cookieName }, COOKIE)
+    .addApiKey({ type: 'apiKey', in: 'header', name: 'Authorization', description: 'Chỉ cho webhook SePay: `Apikey <SEPAY_WEBHOOK_KEY>`' }, SEPAY)
     .addTag('Hệ thống')
     .addTag('Xác thực', 'UC01 — đăng nhập, đăng xuất')
     .addTag('Sản phẩm', 'UC06 — menu, danh mục, thêm món, sửa giá')
     .addTag('Đơn hàng', 'UC02–UC05 — tạo đơn, hóa đơn, quầy pha')
+    .addTag('Thanh toán', 'UC07 — chuyển khoản QR, webhook SePay')
     .addTag('Kiểm thử', 'Báo cáo kiểm thử tự động — chỉ Chủ quán')
     .build();
 

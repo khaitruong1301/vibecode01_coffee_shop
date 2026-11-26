@@ -20,6 +20,7 @@ Wireframe màn hình (draw.io, 9 trang): `../ui-ux/wireframe-man-hinh.drawio`
 | Pha chế | chính | Nhận đơn ở màn quầy pha |
 | Chủ quán (admin) | chính | Sửa giá, thêm món |
 | GrabFood / ShopeeFood | hệ thống ngoài | Nguồn đơn giao đồ ăn |
+| SePay | hệ thống ngoài | Báo giao dịch chuyển khoản vào tài khoản ngân hàng của quán (webhook) |
 
 > Chưa rõ: đề có nhắc **quản lý** trong phần quy mô nhưng không mô tả quyền — hệ thống chưa có vai trò này.
 
@@ -33,8 +34,9 @@ Wireframe màn hình (draw.io, 9 trang): `../ui-ux/wireframe-man-hinh.drawio`
 | UC04 | Nhận đơn giao đồ ăn | Thu ngân, GrabFood/ShopeeFood | `/checkout` chọn nguồn + nhập mã đơn đối tác (nhập tay) |
 | UC05 | Nhận đơn ở màn quầy pha | Pha chế | `/barista` → `GET /api/orders`, `PATCH /api/orders/:id/status` |
 | UC06 | Quản lý sản phẩm (thêm món, sửa giá) | Chủ quán | `/products` → `GET/POST/PATCH /api/products` |
+| UC07 | Thanh toán chuyển khoản QR (SePay) | Thu ngân, Chủ quán, SePay | `/checkout` chọn Chuyển khoản → `/receipt/CP-…` hiện QR · `POST /api/payments/sepay/webhook` · `/payments` → `GET /api/payments/transactions` |
 
-Quan hệ: UC02, UC04, UC05, UC06 `<<include>>` UC01 · UC03 `<<extend>>` UC02 · "Chọn size" `<<extend>>` "Chọn món".
+Quan hệ: UC02, UC04, UC05, UC06 `<<include>>` UC01 · UC03 `<<extend>>` UC02 · UC07 `<<extend>>` UC02 · "Chọn size" `<<extend>>` "Chọn món".
 
 ## 4. Đặc tả UC02 — Bán hàng tại quầy
 
@@ -58,6 +60,34 @@ Quan hệ: UC02, UC04, UC05, UC06 `<<include>>` UC01 · UC03 `<<extend>>` UC02 �
 - 3c. Có món với số lượng < 1 hoặc > 50 (gồm số âm, 0, số thập phân) → 400.
 - 4a. Món không tồn tại → 400.
 
+## 4b. Đặc tả UC07 — Thanh toán chuyển khoản QR (SePay)
+
+| Mục | Nội dung |
+|---|---|
+| Tác nhân | Thu ngân (chính), Chủ quán, SePay (hệ thống ngoài) |
+| Tiền điều kiện | Server đã cấu hình `SEPAY_BANK`, `SEPAY_ACCOUNT_NO` (+ `SEPAY_ACCOUNT_NAME`) và `SEPAY_WEBHOOK_KEY`; chủ quán đã tạo webhook trên SePay trỏ tới `/api/payments/sepay/webhook` (hướng dẫn trên trang `/payments`) |
+| Hậu điều kiện | Đơn `payment_status = paid`, có `paid_at`; giao dịch lưu ở `bank_transactions` gắn với đơn; đơn hiện ở màn quầy pha |
+
+**Luồng chính**
+1. Thu ngân chọn món (UC02), ở mục "Khách trả" chọn **Chuyển khoản**, bấm **Thanh toán chuyển khoản**.
+2. Server tạo đơn `transfer` / `unpaid` (chưa hiện ở quầy pha — BR06), trả mã QR VietQR (số tiền + nội dung `CP000123`).
+3. Màn hóa đơn hiện QR; khách quét bằng app ngân hàng và chuyển tiền.
+4. SePay gọi webhook kèm API key; server tìm mã đơn trong nội dung, cộng dồn tiền đã nhận.
+5. Đủ tiền → đơn chuyển sang đã thanh toán; màn hóa đơn (hỏi lại mỗi 3 giây) báo "Đã nhận đủ tiền", đơn hiện ở quầy pha.
+
+**Luồng thay thế / ngoại lệ**
+- 1a. Đơn GrabFood / ShopeeFood → không có lựa chọn chuyển khoản (đối tác thu tiền); API → 400.
+- 1b. Chưa cấu hình đủ tài khoản nhận tiền + webhook key → nút Chuyển khoản bị khoá; API → 400.
+- 4a. Sai / thiếu API key → 401, không ghi gì. Chưa đặt key → 503.
+- 4b. Chuyển thiếu → giao dịch `partial`, QR hiện số còn thiếu; chuyển thêm cho đủ → đơn đã thanh toán.
+- 4c. Nội dung không có mã đơn / đơn không tồn tại / tiền vào tài khoản khác `SEPAY_ACCOUNT_NO` → giao dịch `unmatched` (chủ quán xem ở `/payments`, xử lý tay).
+- 4d. Chuyển vào đơn đã thanh toán → `already_paid` (thu ngân hoàn tiền tay).
+- 4e. SePay gửi lại cùng giao dịch → chỉ xử lý một lần.
+- 5a. Khách đổi ý trả tiền mặt → thu ngân bấm **Khách trả tiền mặt** → đơn thành tiền mặt, đã thanh toán, lưu người xác nhận (`paid_by_id`); phần đã chuyển khoản (nếu có) vẫn ở `amountReceived`.
+- 5b. Thu ngân rời màn hóa đơn khi khách chưa chuyển → đơn nằm ở mục "Đơn chờ chuyển khoản" trên `/payments`, mở lại được QR.
+
+_Chưa có_: huỷ đơn chờ chuyển khoản bị bỏ dở; cảnh báo số tiền chuyển thừa cần hoàn.
+
 ## 5. Luật bán hàng
 
 | Mã | Luật |
@@ -67,6 +97,7 @@ Quan hệ: UC02, UC04, UC05, UC06 `<<include>>` UC01 · UC03 `<<extend>>` UC02 �
 | BR03 | Đơn phải có ít nhất một món. |
 | BR04 | Chỉ nhân viên đã đăng nhập mới tạo được đơn — cụ thể: Thu ngân và Chủ quán; Pha chế không tạo đơn (403). |
 | BR05 | Size L cộng 6.000đ vào giá món; S, M giữ giá gốc; món không size (bánh) luôn giá gốc _(thay đổi giữa chừng — test cũ phải chỉ ra chỗ cần sửa)_. |
+| BR06 | Đơn chuyển khoản chỉ được pha khi đã nhận đủ tiền: chưa hiện ở quầy pha, không chuyển trạng thái pha được (409). Tiền mặt / đơn đối tác coi như đã thanh toán lúc tạo. Quầy pha xếp theo thời điểm thanh toán. |
 
 ## 6. Lỗi thật đã tìm thấy trong `server.js`
 
@@ -86,6 +117,7 @@ Bản NestJS trong repo đã chặn cả 3 lỗi; test tương ứng nằm trong
 | BR04 | Guard toàn cục `JwtAuthGuard` (mọi route cần đăng nhập) + `@Roles('cashier', 'admin')` trên `POST /orders` |
 | L3 | DTO không có field giá; ValidationPipe `whitelist` loại field lạ |
 | Luồng pha chế | `backend/src/orders/order-status.ts`: Chờ pha → Đang pha → Xong — chờ giao → Đã giao, không nhảy bước |
+| BR06, UC07 | `backend/src/payments/payment-rules.ts` (hàm thuần `findOrderId`, `reconcile`) + `orders.service.ts` (lọc `payment_status = paid`, chặn chuyển trạng thái) + CHECK `orders_unpaid_not_prepared` |
 
 ## 8. Câu hỏi của chủ quán
 

@@ -5,12 +5,13 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { HealthController } from './health/health.controller';
 import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { QualityModule } from './quality/quality.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ProductsModule, OrdersModule, QualityModule],
+  imports: [PrismaModule, AuthModule, ProductsModule, OrdersModule, PaymentsModule, QualityModule],
   controllers: [HealthController],
   providers: [
     // Guard toàn cục: MỌI route mặc định cần đăng nhập (chặn lỗi L1); route công khai phải gắn @Public().

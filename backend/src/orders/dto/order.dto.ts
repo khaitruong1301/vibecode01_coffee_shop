@@ -21,6 +21,7 @@ const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? val
 const SIZES = ['S', 'M', 'L'] as const;
 const SOURCES = ['counter', 'grabfood', 'shopeefood'] as const;
 const STATUSES = ['preparing', 'ready', 'done'] as const;
+const PAYMENT_METHODS = ['cash', 'transfer'] as const;
 
 /**
  * Một dòng món. KHÔNG có field giá: `price`, `unitPrice`, `total`… do trình duyệt gửi
@@ -88,6 +89,16 @@ export class CreateOrderDto {
   @IsString()
   @MaxLength(200, { message: 'Ghi chú đơn tối đa 200 ký tự' })
   note?: string;
+
+  // UC07 — chuyển khoản: đơn chờ SePay báo đủ tiền mới hiện ở quầy pha (BR06). Chỉ đơn tại quầy.
+  @ApiPropertyOptional({
+    enum: PAYMENT_METHODS,
+    default: 'cash',
+    description: 'cash = đã thu tiền mặt; transfer = khách quét QR chuyển khoản, đơn chờ thanh toán (chỉ đơn tại quầy)',
+  })
+  @IsOptional()
+  @IsIn(PAYMENT_METHODS, { message: 'Phương thức thanh toán chỉ nhận cash hoặc transfer' })
+  paymentMethod?: (typeof PAYMENT_METHODS)[number];
 }
 
 export class ListOrdersQuery {
@@ -109,6 +120,11 @@ export class ListOrdersQuery {
   @Min(1)
   @Max(200)
   limit?: number;
+
+  @ApiPropertyOptional({ enum: ['paid', 'unpaid'], default: 'paid', description: 'unpaid = đơn chờ chuyển khoản (UC07, chỉ Thu ngân / Chủ quán)' })
+  @IsOptional()
+  @IsIn(['paid', 'unpaid'], { message: 'payment chỉ nhận paid hoặc unpaid' })
+  payment?: 'paid' | 'unpaid';
 }
 
 export class UpdateStatusDto {

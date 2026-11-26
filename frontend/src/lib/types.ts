@@ -3,6 +3,9 @@ export type Role = 'cashier' | 'barista' | 'admin';
 export type Size = 'S' | 'M' | 'L';
 export type OrderSource = 'counter' | 'grabfood' | 'shopeefood';
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'done';
+export type PaymentMethod = 'cash' | 'transfer';
+export type PaymentStatus = 'paid' | 'unpaid';
+export type BankTxStatus = 'matched' | 'partial' | 'already_paid' | 'unmatched' | 'outgoing';
 
 export interface User {
   id: number;
@@ -45,6 +48,18 @@ export interface OrderItem {
   note: string | null;
 }
 
+/** Thông tin quét QR — chỉ có khi đơn chuyển khoản chưa thanh toán (UC07). */
+export interface TransferInfo {
+  bank: string;
+  accountNo: string;
+  accountName: string | null;
+  /** Số tiền còn phải chuyển */
+  amount: number;
+  /** Nội dung chuyển khoản bắt buộc, vd. CP000123 */
+  content: string;
+  qrUrl: string;
+}
+
 export interface Order {
   id: number;
   code: string;
@@ -54,9 +69,43 @@ export interface Order {
   status: OrderStatus;
   statusLabel: string;
   total: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paymentLabel: string;
+  paidAt: string | null;
+  /** Nhân viên xác nhận thu tiền mặt; null khi SePay báo tiền về */
+  paidBy: { id: number; fullName: string } | null;
+  amountReceived: number;
+  transfer: TransferInfo | null;
   createdAt: string;
   cashier: { id: number; fullName: string };
   items: OrderItem[];
+}
+
+// ---- Thanh toán chuyển khoản SePay (UC07)
+export interface BankTransaction {
+  id: number;
+  sepayId: number;
+  gateway: string;
+  accountNumber: string;
+  transferType: 'in' | 'out';
+  amount: number;
+  content: string;
+  referenceCode: string | null;
+  transactionDate: string;
+  createdAt: string;
+  status: BankTxStatus;
+  statusLabel: string;
+  orderCode: string | null;
+}
+
+export interface PaymentSettings {
+  transferEnabled: boolean;
+  bank: string | null;
+  accountNo: string | null;
+  accountName: string | null;
+  webhookKeyConfigured: boolean;
+  webhookPath: string;
 }
 
 // ---- Báo cáo kiểm thử (GET /api/quality/report — chỉ Chủ quán), sinh bởi scripts/test-report.mjs
