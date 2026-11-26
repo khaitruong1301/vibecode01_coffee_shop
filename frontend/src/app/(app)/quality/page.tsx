@@ -140,7 +140,7 @@ function TestList({ tests, label = 'Danh sách test' }: { tests: TestCase[]; lab
             className={`px-3 py-2 text-sm ${t.recent ? 'border-l-4 border-primary bg-secondary/60' : 'border-l-4 border-transparent'}`}
           >
             <div className="flex items-start gap-2">
-              <span className="flex shrink-0 flex-col items-start gap-1">
+              <span className="flex w-24 shrink-0 flex-col items-start gap-1">
                 <StatusBadge status={t.status} />
                 {t.recent && <RecentBadge recent={t.recent} />}
               </span>
