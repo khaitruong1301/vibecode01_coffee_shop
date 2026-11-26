@@ -70,9 +70,9 @@ describe('AuthProvider (bảo vệ trang phía frontend)', () => {
 
 describe('Navbar', () => {
   it.each([
-    ['cashier', ['Bán hàng']],
+    ['cashier', ['Bán hàng', 'Chuyển khoản']],
     ['barista', ['Quầy pha']],
-    ['admin', ['Bán hàng', 'Quầy pha', 'Sản phẩm', 'Kiểm thử']],
+    ['admin', ['Bán hàng', 'Quầy pha', 'Chuyển khoản', 'Sản phẩm', 'Kiểm thử']],
   ] as [Role, string[]][])('vai %s chỉ thấy menu %j', async (role, links) => {
     mockMe(200, user(role));
     render(<AuthProvider><Navbar /></AuthProvider>);

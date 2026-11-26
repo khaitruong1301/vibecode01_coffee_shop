@@ -17,3 +17,4 @@ export function formatTime(iso: string): string {
 
 export const SOURCE_LABEL = { counter: 'Tại quầy', grabfood: 'GrabFood', shopeefood: 'ShopeeFood' } as const;
 export const ROLE_LABEL = { cashier: 'Thu ngân', barista: 'Pha chế', admin: 'Chủ quán' } as const;
+export const PAYMENT_METHOD_LABEL = { cash: 'Tiền mặt', transfer: 'Chuyển khoản' } as const;

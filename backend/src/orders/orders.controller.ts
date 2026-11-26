@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types';
 import { Auth, CurrentUser } from '../auth/decorators';
@@ -22,6 +22,7 @@ export class OrdersController {
       'Chỉ gửi `productId`, `size`, `quantity`. Server lấy giá từ DB và tự tính `unitPrice`, `lineTotal`, `total` (BR01, chặn lỗi L3).',
       'Số lượng nguyên 1–50, cùng món nhiều dòng cộng lại ≤ 50 (BR02, chặn lỗi L2); đơn phải có ít nhất một món (BR03); size L +6.000đ (BR05).',
       'Đơn GrabFood / ShopeeFood bắt buộc `partnerCode`.',
+      '`paymentMethod: transfer` (UC07, chỉ đơn tại quầy): đơn chờ chuyển khoản, phản hồi có `transfer.qrUrl`; SePay báo đủ tiền thì đơn mới hiện ở quầy pha (BR06).',
     ].join('\n\n'),
   })
   @ApiCreatedResponse({ type: OrderDto })
@@ -32,11 +33,18 @@ export class OrdersController {
 
   @Auth()
   @Get()
-  @ApiOperation({ summary: 'Danh sách đơn cho màn quầy pha (UC05)', description: 'Sắp xếp đơn cũ nhất trước.' })
+  @ApiOperation({
+    summary: 'Danh sách đơn cho màn quầy pha (UC05) / đơn chờ chuyển khoản (UC07)',
+    description:
+      'Mặc định: đơn đã thanh toán (BR06), thanh toán trước lên trước. `?payment=unpaid`: đơn đang chờ chuyển khoản, mới nhất trước — chỉ Thu ngân, Chủ quán (Pha chế → 403).',
+  })
   @ApiOkResponse({ type: OrderListDto })
-  @ApiErrors(400)
-  list(@Query() q: ListOrdersQuery): Promise<OrderListDto> {
-    return this.orders.list(q.status, q.limit);
+  @ApiErrors(400, 403)
+  list(@Query() q: ListOrdersQuery, @CurrentUser() user: AuthUser): Promise<OrderListDto> {
+    if (q.payment === 'unpaid' && user.role === 'barista') {
+      throw new ForbiddenException({ error: 'Bạn không có quyền thực hiện thao tác này' });
+    }
+    return this.orders.list(q.status, q.limit, q.payment);
   }
 
   @Auth()
@@ -49,11 +57,25 @@ export class OrdersController {
     return this.orders.findByCode(code);
   }
 
+  @Auth('cashier', 'admin')
+  @Post(':id/pay-cash')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Khách trả tiền mặt thay vì chuyển khoản (UC07) — Thu ngân, Chủ quán',
+    description: 'Chỉ cho đơn đang chờ chuyển khoản. Đơn chuyển sang đã thanh toán (tiền mặt) và hiện ở quầy pha. Đơn đã thanh toán → 409.',
+  })
+  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiOkResponse({ type: OrderDto })
+  @ApiErrors(400, 404, 409)
+  payCash(@Param('id', IdPipe) id: number, @CurrentUser() user: AuthUser): Promise<OrderDto> {
+    return this.orders.payCash(id, user);
+  }
+
   @Auth('barista', 'admin')
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Chuyển trạng thái pha chế (UC05) — Pha chế, Chủ quán',
-    description: 'Chỉ đi tới bước kế tiếp: pending → preparing → ready → done. Sai thứ tự hoặc người khác vừa cập nhật → 409.',
+    description: 'Chỉ đi tới bước kế tiếp: pending → preparing → ready → done. Sai thứ tự, đơn chưa thanh toán (BR06) hoặc người khác vừa cập nhật → 409.',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiOkResponse({ type: OrderDto })

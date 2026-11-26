@@ -33,7 +33,7 @@ Nhãn trạng thái: Chờ pha · Đang pha · Xong — chờ giao · Đã giao 
 | `Button` | `variant`: primary / secondary / ghost / danger · `size`: sm (36px) / md (44px) / lg (56px) · `loading` hiện vòng xoay và khóa nút |
 | `Input` | `invalid` tô viền đỏ; mặc định `w-full`, truyền class `w-*` để đặt chiều rộng khác |
 | `Field` | nhãn + `error` (đỏ) hoặc `hint` (xám) dưới ô |
-| `Chip` | nút dạng viên (`active`, `aria-pressed`) — nguồn đơn, danh mục, size, bộ lọc |
+| `Chip` | nút dạng viên (`active`, `aria-pressed`, `disabled` mờ + con trỏ cấm) — nguồn đơn, phương thức thanh toán, danh mục, size, bộ lọc |
 | `Alert` | `kind`: error / success / info |
 | `Modal` | đóng bằng Esc, bấm nền, nút ×; `footer` cho nút hành động |
 | `Spinner` | trạng thái đang tải kèm nhãn |
@@ -46,8 +46,9 @@ Khác: `AuthProvider` (phiên + `useRequireRole`), `Navbar` (menu theo vai trò,
 |---|---|---|---|
 | `/login` | công khai | Form đăng nhập, `?next=` quay lại trang trước | UC01 |
 | `/` | đã đăng nhập | Chuyển tới trang mặc định: thu ngân → `/checkout`, pha chế → `/barista`, chủ quán → `/products` | — |
-| `/checkout` | cashier, admin | Nguồn đơn (+ mã đơn đối tác), tìm/lọc món, chọn size, giỏ (−/+ số lượng 1–50, lỗi theo dòng), tạm tính, nút Thanh toán; giỏ lưu `sessionStorage`; 401 → hộp thoại đăng nhập lại | UC02, UC04 |
-| `/receipt/[code]` | đã đăng nhập | Hóa đơn đọc từ server, nút In (ẩn khi in) và Đơn mới | UC03 |
+| `/checkout` | cashier, admin | Nguồn đơn (+ mã đơn đối tác), tìm/lọc món, chọn size, giỏ (−/+ số lượng 1–50, lỗi theo dòng), tạm tính, "Khách trả: Tiền mặt / Chuyển khoản" (chỉ đơn tại quầy; Chuyển khoản khoá khi chưa cấu hình tài khoản), nút Thanh toán / Thanh toán chuyển khoản; giỏ lưu `sessionStorage`; 401 → hộp thoại đăng nhập lại | UC02, UC04, UC07 |
+| `/receipt/[code]` | đã đăng nhập | Hóa đơn đọc từ server (dòng "Thanh toán: phương thức · trạng thái"), nút In (ẩn khi in) và Đơn mới. Đơn chờ chuyển khoản: khung QR (ngân hàng, số TK, số tiền còn thiếu, nội dung + nút Chép), "Đang chờ tiền về…", hỏi lại server mỗi 3 giây, nút "Khách trả tiền mặt" (thu ngân/chủ quán); tiền về → thông báo "Đã nhận đủ tiền"; hết phiên → dừng hỏi, báo "Đăng nhập lại" | UC03, UC07 |
+| `/payments` | cashier, admin | Menu "Chuyển khoản": mục "Đơn chờ chuyển khoản" (link mở lại QR, đã nhận / tổng) khi có; bảng giao dịch SePay (thời gian, ±số tiền, nội dung, link đơn, nhãn kết quả có biểu tượng), tự làm mới 10 giây; chủ quán thấy thêm khung "Kết nối SePay" (trạng thái cấu hình + URL webhook để chép + cách điền form SePay) | UC07 |
 | `/barista` | barista, admin | 3 cột Chờ pha / Đang pha / Xong — chờ giao, tự làm mới 5 giây, không hiện giá | UC05 |
 | `/account` | đã đăng nhập | Thông tin tài khoản + đổi mật khẩu (kiểm tra phía client, lỗi theo từng ô, báo thu hồi phiên thiết bị khác); mở bằng tên người dùng trên thanh menu | UC01 |
 | `/quality` | admin | Báo cáo kiểm thử: ô tổng quan, 15 hạng mục (mở xem từng test, lọc Không đạt / Chưa làm), coverage có vạch ngưỡng, load test, smoke, lần chạy CI trên GitHub, lỗi phát hiện, khuyến nghị; chưa có báo cáo → hướng dẫn `npm run test:report` | — |
@@ -62,4 +63,5 @@ Khác: `AuthProvider` (phiên + `useRequireRole`), `Navbar` (menu theo vai trò,
 | Pha chế / Quầy pha | Barista (trên giao diện) |
 | Thanh toán | Checkout |
 | Tại quầy / GrabFood / ShopeeFood | Counter |
+| Tiền mặt / Chuyển khoản · Đã thanh toán / Chờ chuyển khoản | Cash / Transfer · Paid / Unpaid |
 | Chủ quán | Admin (trên giao diện) |

@@ -86,7 +86,7 @@ export function Chip({ active, className = '', ...props }: ButtonHTMLAttributes<
       type="button"
       aria-pressed={active}
       {...props}
-      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-surface hover:bg-secondary'
       } ${className}`}
     />

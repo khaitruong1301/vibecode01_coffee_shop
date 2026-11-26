@@ -40,7 +40,7 @@ describe('Swagger (e2e)', () => {
   });
 
   it('khai báo đăng nhập bằng Bearer và cookie', () => {
-    expect(Object.keys(doc.components.securitySchemes).sort()).toEqual(['bearer', 'cookie']);
+    expect(Object.keys(doc.components.securitySchemes).sort()).toEqual(['bearer', 'cookie', 'sepay']);
   });
 
   it('route công khai không có ổ khóa, route cần đăng nhập có ổ khóa + lỗi 401', () => {
@@ -50,6 +50,14 @@ describe('Swagger (e2e)', () => {
     const create = doc.paths['/api/orders'].post;
     expect(create.security).toEqual(expect.arrayContaining([{ bearer: [] }, { cookie: [] }]));
     expect(Object.keys(create.responses)).toEqual(expect.arrayContaining(['201', '400', '401', '403']));
+  });
+
+  it('webhook SePay không cần đăng nhập, chỉ xác thực bằng API key (UC07)', () => {
+    const hook = doc.paths['/api/payments/sepay/webhook'].post;
+    expect(hook.security).toEqual([{ sepay: [] }]);
+    expect(Object.keys(hook.responses)).toEqual(expect.arrayContaining(['200', '400', '401', '503']));
+    expect(doc.paths['/api/payments/transactions'].get.responses).toHaveProperty('403');
+    expect(doc.paths['/api/orders/{id}/pay-cash'].post.responses).toHaveProperty('409');
   });
 
   it('route theo vai trò có lỗi 403, route chỉ cần đăng nhập thì không', () => {
@@ -70,7 +78,7 @@ describe('Swagger (e2e)', () => {
 
   it('phản hồi có schema đầy đủ', () => {
     expect(Object.keys(doc.components.schemas.OrderDto.properties ?? {})).toEqual(
-      expect.arrayContaining(['code', 'status', 'total', 'items']),
+      expect.arrayContaining(['code', 'status', 'total', 'items', 'paymentMethod', 'paymentStatus', 'transfer']),
     );
     expect(doc.components.schemas.ProductDto.properties).toHaveProperty('priceL');
     expect(doc.components.schemas.ErrorResponseDto.properties).toHaveProperty('error');
